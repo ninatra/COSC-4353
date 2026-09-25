@@ -10,6 +10,24 @@ database tables for every step already exist in `server/prisma/schema.prisma`.
 - [x] User and Administrator roles, with role-protected pages and API routes
 - [x] Email verification (design only: the link is printed in the server console)
 
+## A2: Front end with mock data
+
+The A2 screens run entirely in the browser on demo data, so no backend work is
+needed for them. Login still uses the real API.
+
+- `client/src/mockData.js`: demo services, queues, history and notifications
+- `client/src/queueLogic.js`: queue rules (ordering, positions, wait times, notifications)
+- `client/src/QueueContext.jsx`: shares that state with every screen through `useQueues()`,
+  saves it in localStorage and syncs it across tabs. Open the admin in one tab and the user
+  in another, and "Serve next" updates the user's screen live.
+
+- [x] Login / Registration with client-side validation
+- [x] User Dashboard, Join Queue, Queue Status
+- [x] Admin Dashboard, Queue Management
+- [x] In-app notifications (bell in the nav bar)
+- [ ] Service Management (`pages/ServiceManagement.jsx`, see the TODO at the top)
+- [ ] History (`pages/History.jsx`, see the TODO at the top)
+
 ## 1. Service management (admin)
 
 API: `server/src/routes/services.js`, mounted at `/api/services`
