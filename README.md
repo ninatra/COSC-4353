@@ -34,6 +34,54 @@ Users can browse available services, join a queue, and track their position and 
 
 Administrators can create and maintain services, manage active queues, monitor queue activity, and oversee the users waiting for service. The administrative tools are designed to help staff keep queues organized and provide service efficiently.
 
+## Getting Started
+
+**Requirements:** Node.js 20 or newer.
+
+```bash
+# 1. Install dependencies for the client and server
+npm install
+
+# 2. Create your local settings file
+cp server/.env.example server/.env
+
+# 3. Create the database and load demo data
+npm run setup
+
+# 4. Start the API (port 4000) and the web app (port 5173) together
+npm run dev
+```
+
+Open http://localhost:5173 and log in with a demo account (password `password123`):
+
+| Role          | Email                  |
+| ------------- | ---------------------- |
+| Administrator | admin@queuesmart.dev   |
+| User          | user@queuesmart.dev    |
+
+To register a new administrator, use the admin code set in `ADMIN_SIGNUP_CODE` in `server/.env`.
+Email verification links are printed in the server console instead of being emailed.
+
+Useful commands:
+
+- `npm run db:studio -w server` opens a browser UI for viewing and editing the database.
+- To reset the database, delete `server/prisma/dev.db` and run `npm run setup`.
+
+## Project Structure
+
+```
+client/   React web app (Vite)
+  src/pages/        Login, Register, User and Admin dashboards
+  src/AuthContext   Keeps track of the logged-in user
+server/   Express REST API
+  prisma/           Database schema and demo data
+  src/routes/       API endpoints (/api/auth, ...)
+  src/middleware/   Login and role checks
+docs/     Design documents and the build roadmap
+```
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the features still to build.
+
 ## Project Goal
 
 The goal of QueueSmart is to improve the queue experience for both customers and service providers. By moving queue management to a mobile and web platform, the application helps reduce congestion, improves visibility into wait times, and gives administrators better control over their services.

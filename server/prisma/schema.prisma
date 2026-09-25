@@ -1,0 +1,70 @@
+// QueueSmart database schema.
+// SQLite does not support enums, so enum-like fields are strings; the allowed
+// values are listed in the comments and enforced in src/constants.js.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                Int      @id @default(autoincrement())
+  name              String
+  email             String   @unique
+  passwordHash      String
+  role              String   @default("USER") // USER | ADMIN
+  emailVerified     Boolean  @default(false)
+  verificationToken String?  @unique
+  createdAt         DateTime @default(now())
+
+  queueEntries  QueueEntry[]
+  notifications Notification[]
+}
+
+model Service {
+  id               Int      @id @default(autoincrement())
+  name             String
+  description      String
+  expectedDuration Int // minutes per person
+  priority         String   @default("MEDIUM") // LOW | MEDIUM | HIGH
+  isOpen           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  queueEntries QueueEntry[]
+}
+
+// One row per time a user joins a queue. Rows are never deleted, so they
+// double as the user's queue history and the source for admin statistics.
+model QueueEntry {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  serviceId   Int
+  priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  status      String    @default("WAITING") // WAITING | SERVING | SERVED | LEFT | NO_SHOW
+  joinedAt    DateTime  @default(now())
+  servedAt    DateTime? // when service started
+  completedAt DateTime? // when service ended or the user left
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@index([serviceId, status])
+  @@index([userId])
+}
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+}
