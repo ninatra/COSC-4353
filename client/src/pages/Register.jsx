@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
+import AuthLayout from '../components/AuthLayout.jsx';
 import FormField, { errorProps } from '../components/FormField.jsx';
 import { homePath } from '../components/ProtectedRoute.jsx';
 import { NAME_MAX, PASSWORD_MIN, validateRegister } from '../utils/validation.js';
@@ -47,76 +48,78 @@ export default function Register() {
   }
 
   return (
-    <form className="card auth-card" onSubmit={handleSubmit} noValidate>
-      <h1>Create an account</h1>
-      {serverError && <p className="error" role="alert">{serverError}</p>}
-      <FormField label="Full name" id="name" error={errors.name}>
-        <input
-          id="name"
-          autoComplete="name"
-          maxLength={NAME_MAX}
-          value={form.name}
-          onChange={update('name')}
-          {...errorProps('name', errors.name)}
-        />
-      </FormField>
-      <FormField label="Email" hint="(this is your username)" id="email" error={errors.email}>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          value={form.email}
-          onChange={update('email')}
-          {...errorProps('email', errors.email)}
-        />
-      </FormField>
-      <FormField
-        label="Password"
-        hint={`(at least ${PASSWORD_MIN} characters, with a letter and a number)`}
-        id="password"
-        error={errors.password}
-      >
-        <input
-          id="password"
-          type="password"
-          autoComplete="new-password"
-          value={form.password}
-          onChange={update('password')}
-          {...errorProps('password', errors.password)}
-        />
-      </FormField>
-      <FormField label="Confirm password" id="confirmPassword" error={errors.confirmPassword}>
-        <input
-          id="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          value={form.confirmPassword}
-          onChange={update('confirmPassword')}
-          {...errorProps('confirmPassword', errors.confirmPassword)}
-        />
-      </FormField>
-      <FormField label="Account type" id="role">
-        <select id="role" value={form.role} onChange={update('role')}>
-          <option value="USER">User (join queues)</option>
-          <option value="ADMIN">Administrator (manage services)</option>
-        </select>
-      </FormField>
-      {form.role === 'ADMIN' && (
-        <FormField label="Administrator code" id="adminCode" error={errors.adminCode}>
+    <AuthLayout>
+      <form className="card auth-card" onSubmit={handleSubmit} noValidate>
+        <h1>Create an account</h1>
+        {serverError && <p className="error" role="alert">{serverError}</p>}
+        <FormField label="Full name" id="name" error={errors.name}>
           <input
-            id="adminCode"
-            value={form.adminCode}
-            onChange={update('adminCode')}
-            {...errorProps('adminCode', errors.adminCode)}
+            id="name"
+            autoComplete="name"
+            maxLength={NAME_MAX}
+            value={form.name}
+            onChange={update('name')}
+            {...errorProps('name', errors.name)}
           />
         </FormField>
-      )}
-      <button type="submit" disabled={submitting}>
-        {submitting ? 'Creating account…' : 'Register'}
-      </button>
-      <p className="muted">
-        Already registered? <Link to="/login">Log in</Link>
-      </p>
-    </form>
+        <FormField label="Email" hint="(this is your username)" id="email" error={errors.email}>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={form.email}
+            onChange={update('email')}
+            {...errorProps('email', errors.email)}
+          />
+        </FormField>
+        <FormField
+          label="Password"
+          hint={`(at least ${PASSWORD_MIN} characters, with a letter and a number)`}
+          id="password"
+          error={errors.password}
+        >
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            value={form.password}
+            onChange={update('password')}
+            {...errorProps('password', errors.password)}
+          />
+        </FormField>
+        <FormField label="Confirm password" id="confirmPassword" error={errors.confirmPassword}>
+          <input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            value={form.confirmPassword}
+            onChange={update('confirmPassword')}
+            {...errorProps('confirmPassword', errors.confirmPassword)}
+          />
+        </FormField>
+        <FormField label="Account type" id="role">
+          <select id="role" value={form.role} onChange={update('role')}>
+            <option value="USER">User (join queues)</option>
+            <option value="ADMIN">Administrator (manage services)</option>
+          </select>
+        </FormField>
+        {form.role === 'ADMIN' && (
+          <FormField label="Administrator code" id="adminCode" error={errors.adminCode}>
+            <input
+              id="adminCode"
+              value={form.adminCode}
+              onChange={update('adminCode')}
+              {...errorProps('adminCode', errors.adminCode)}
+            />
+          </FormField>
+        )}
+        <button type="submit" disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Register'}
+        </button>
+        <p className="muted">
+          Already registered? <Link to="/login">Log in</Link>
+        </p>
+      </form>
+    </AuthLayout>
   );
 }

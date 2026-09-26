@@ -85,16 +85,16 @@ export default function AdminDashboard() {
                   <td>{formatWait(waitForNewArrival(state, service.id))}</td>
                   <td>
                     <div className="button-row">
+                      <Link className="button secondary small" to={`/admin/queues/${service.id}`}>
+                        Manage queue
+                      </Link>
                       <button
                         className={service.isOpen ? 'secondary small' : 'small'}
                         onClick={() => setServiceOpen(service.id, !service.isOpen)}
                       >
-                        {service.isOpen ? 'Close queue' : 'Open queue'}
+                        {service.isOpen ? 'Close' : 'Open'}
                       </button>
-                      <Link className="button secondary small" to={`/admin/queues/${service.id}`}>
-                        Manage queue
-                      </Link>
-                      <Link className="button secondary small" to={`/admin/services?edit=${service.id}`}>
+                      <Link className="small" to={`/admin/services?edit=${service.id}`}>
                         Edit
                       </Link>
                     </div>

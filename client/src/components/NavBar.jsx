@@ -22,37 +22,39 @@ export default function NavBar() {
 
   return (
     <header className="nav">
-      <div className="nav-top">
-        <Link to={user ? homePath(user) : '/login'} className="brand">
-          <span className="brand-mark" aria-hidden="true">Q</span>
-          QueueSmart
-        </Link>
-        {user ? (
-          <div className="nav-right">
-            <NotificationBell />
-            <span className="nav-user">
-              {user.name} <span className="badge">{user.role === 'ADMIN' ? 'Admin' : 'User'}</span>
-            </span>
-            <button className="secondary" onClick={logout}>
-              Log out
-            </button>
-          </div>
-        ) : (
-          <div className="nav-right">
-            <Link to="/login">Log in</Link>
-            <Link to="/register">Register</Link>
-          </div>
+      <div className="nav-inner">
+        <div className="nav-top">
+          <Link to={user ? homePath(user) : '/login'} className="brand">
+            <span className="brand-mark" aria-hidden="true">Q</span>
+            QueueSmart
+          </Link>
+          {user ? (
+            <div className="nav-right">
+              <NotificationBell />
+              <span className="nav-user">
+                {user.name} <span className="badge">{user.role === 'ADMIN' ? 'Admin' : 'User'}</span>
+              </span>
+              <button className="secondary" onClick={logout}>
+                Log out
+              </button>
+            </div>
+          ) : (
+            <div className="nav-right">
+              <Link to="/login">Log in</Link>
+              <Link to="/register">Register</Link>
+            </div>
+          )}
+        </div>
+        {user && (
+          <nav className="nav-links" aria-label="Main">
+            {links.map((link) => (
+              <NavLink key={link.to} to={link.to} end={link.end}>
+                {link.label}
+              </NavLink>
+            ))}
+          </nav>
         )}
       </div>
-      {user && (
-        <nav className="nav-links" aria-label="Main">
-          {links.map((link) => (
-            <NavLink key={link.to} to={link.to} end={link.end}>
-              {link.label}
-            </NavLink>
-          ))}
-        </nav>
-      )}
     </header>
   );
 }

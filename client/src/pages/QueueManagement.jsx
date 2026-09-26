@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';
-import { OpenBadge, PriorityBadge, StatusBadge } from '../components/Badges.jsx';
+import { PriorityBadge, StatusBadge } from '../components/Badges.jsx';
 import { findService, servingEntry, statusOf, waitingLine } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
 import { formatTime, formatWait, timeAgo } from '../utils/format.js';
@@ -43,8 +43,11 @@ export default function QueueManagement() {
       <div className="page-header">
         <div>
           <h1>Queue management</h1>
+          <p className="muted">Call people forward, change the order or remove someone from the line.</p>
+        </div>
+        <div className="button-row">
           <label className="inline-label">
-            Service
+            <span className="visually-hidden">Service</span>
             <select
               value={service.id}
               onChange={(e) => {
@@ -55,18 +58,22 @@ export default function QueueManagement() {
               {state.services.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.name}
+                  {s.isOpen ? '' : ' (closed)'}
                 </option>
               ))}
             </select>
           </label>
-        </div>
-        <div className="button-row">
-          <OpenBadge isOpen={service.isOpen} />
           <button className="secondary" onClick={() => setServiceOpen(service.id, !service.isOpen)}>
             {service.isOpen ? 'Close queue' : 'Open queue'}
           </button>
         </div>
       </div>
+
+      {!service.isOpen && (
+        <p className="notice">
+          This queue is closed to new arrivals. People already waiting keep their place.
+        </p>
+      )}
 
       <div className="board">
         <div>
