@@ -4,7 +4,7 @@
 
 export const DEMO_DATE = 'Sep 26, 2026';
 export const DEMO_EMAIL = 'user@queuesmart.dev';
-export const DEMO_NAME = 'Hao Nguyen';
+export const DEMO_NAME = 'Hao Pham';
 export const TINTS = ['blue', 'lilac', 'peach', 'mint', 'sun'];
 export const STATE_VERSION = 3;
 

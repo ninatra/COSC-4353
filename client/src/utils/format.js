@@ -13,7 +13,7 @@ export function fmtTime(minutes) {
 // 1 -> "1 person", 3 -> "3 people"
 export const people = (n) => `${n} ${n === 1 ? 'person' : 'people'}`;
 
-// "Hao Nguyen" -> "HN"
+// "Hao Pham" -> "HP"
 export const initials = (name) =>
   name
     .split(/\s+/)
