@@ -1,14 +1,20 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
+import AppShell from './AppShell.jsx';
 
-// Only renders children for a logged-in user, optionally with a specific role.
-export default function ProtectedRoute({ role, children }) {
+// Layout route: renders the child page inside the app shell, but only for a
+// logged-in user with the right role.
+export default function ProtectedRoute({ role }) {
   const { user, loading } = useAuth();
 
-  if (loading) return <p className="center">Loading…</p>;
+  if (loading) return <p className="loading">Loading…</p>;
   if (!user) return <Navigate to="/login" replace />;
   if (role && user.role !== role) return <Navigate to={homePath(user)} replace />;
-  return children;
+  return (
+    <AppShell>
+      <Outlet />
+    </AppShell>
+  );
 }
 
 export function homePath(user) {

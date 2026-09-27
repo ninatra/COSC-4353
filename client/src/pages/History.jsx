@@ -1,26 +1,33 @@
-// TODO (teammate): History screen.
+// TODO (teammate): History screen (/history).
 //
-// Build here: a table of the user's past queues with Date, Service name and
-// Outcome columns. Bonus: filter by service or by outcome.
+// - Eyebrow "My visits", <h1 id="page-title" tabIndex={-1}>History</h1>,
+//   lead "Past visits and how each one ended."
+// - A table inside <div className="table-wrap"><table className="hist">:
+//   columns Service (with <ServiceTile size="sm">), Date (plus the time if the
+//   row has one: `${row.date} · ${fmtTime(row.time)}`), Ticket (<span className="mono">),
+//   and Outcome (<StatusLabel status={row.outcome} />: served / left / removed).
+//   Give each <td> a data-label (e.g. data-label="Date"); the CSS uses it to
+//   stack each row into a block on phones.
+// - Empty state: <EmptyState title="No visits yet" body="Visits you finish,
+//   leave, or are removed from will be listed here." />
 //
-// Getting the data (mock data, no backend needed):
-//   const { user } = useAuth();                  // from '../AuthContext.jsx'
-//   const { state } = useQueues();               // from '../QueueContext.jsx'
-//   const visits = historyFor(state, user.email); // from '../queueLogic.js'
-//   // each item: { entry, service }
-//   //   entry.joinedAt    ISO date string (use formatDate from '../utils/format.js')
-//   //   entry.status      SERVED | LEFT | REMOVED | NO_SHOW (use <StatusBadge status={...} />)
-//   //   service.name
+// Data (mock, no backend needed):
+//   const { state } = useQueues();
+//   const { user } = useAuth();
+//   const rows = historyFor(state, user.email);   // from '../queueLogic.js', newest first
+//   // row: { date, time?, serviceId, serviceName, outcome, ticketId }
+//   // The service may have been renamed; use findService(state, row.serviceId) ?? { name: row.serviceName, icon: 'building-2', tint: 'sun' }
 //
-// Log in as user@queuesmart.dev to see five past visits in the demo data.
+// Design reference: the prototype's vHistory().
 
 export default function History() {
   return (
-    <section className="stack">
-      <h1>History</h1>
-      <div className="card">
-        <p className="muted">This screen is under construction.</p>
-      </div>
-    </section>
+    <>
+      <p className="eyebrow">My visits</p>
+      <h1 id="page-title" tabIndex={-1}>
+        History
+      </h1>
+      <p className="lead">This screen is under construction.</p>
+    </>
   );
 }

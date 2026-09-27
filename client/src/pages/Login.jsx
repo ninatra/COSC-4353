@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
-import AuthLayout from '../components/AuthLayout.jsx';
-import FormField, { errorProps } from '../components/FormField.jsx';
+import AuthFrame from '../components/AuthFrame.jsx';
+import FormField, { FieldError, fieldProps } from '../components/FormField.jsx';
 import { homePath } from '../components/ProtectedRoute.jsx';
-import { validateLogin } from '../utils/validation.js';
+import { focusFirstError, validateLogin } from '../utils/validation.js';
 
 export default function Login() {
   const { user, login } = useAuth();
@@ -26,8 +26,10 @@ export default function Login() {
     setServerError('');
     const found = validateLogin(form);
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
-
+    if (Object.keys(found).length) {
+      focusFirstError(found, ['email', 'password']);
+      return;
+    }
     setSubmitting(true);
     try {
       const loggedIn = await login(form.email.trim(), form.password);
@@ -40,41 +42,43 @@ export default function Login() {
   }
 
   return (
-    <AuthLayout>
-      <form className="card auth-card" onSubmit={handleSubmit} noValidate>
-        <h1>Log in</h1>
-        {serverError && <p className="error" role="alert">{serverError}</p>}
-        <FormField label="Email" id="email" error={errors.email}>
+    <AuthFrame
+      title="Welcome back"
+      footer={
+        <>
+          New to QueueSmart? <Link to="/register">Create an account</Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} noValidate>
+        {serverError && (
+          <div role="alert" className="form-alert">
+            <FieldError>{serverError}</FieldError>
+          </div>
+        )}
+        <FormField id="email" label="Email" error={errors.email}>
           <input
-            id="email"
             type="email"
             autoComplete="email"
+            placeholder="name@school.edu"
             value={form.email}
             onChange={update('email')}
-            {...errorProps('email', errors.email)}
+            {...fieldProps('email', { error: errors.email })}
           />
         </FormField>
-        <FormField label="Password" id="password" error={errors.password}>
+        <FormField id="password" label="Password" error={errors.password}>
           <input
-            id="password"
             type="password"
             autoComplete="current-password"
             value={form.password}
             onChange={update('password')}
-            {...errorProps('password', errors.password)}
+            {...fieldProps('password', { error: errors.password })}
           />
         </FormField>
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Logging in…' : 'Log in'}
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+          {submitting ? 'Signing in…' : 'Sign in'}
         </button>
-        <p className="muted">
-          No account? <Link to="/register">Register</Link>
-        </p>
-        <p className="demo-hint">
-          Demo accounts: <strong>user@queuesmart.dev</strong> or <strong>admin@queuesmart.dev</strong>,
-          password <strong>password123</strong>
-        </p>
       </form>
-    </AuthLayout>
+    </AuthFrame>
   );
 }

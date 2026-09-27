@@ -12,21 +12,24 @@ database tables for every step already exist in `server/prisma/schema.prisma`.
 
 ## A2: Front end with mock data
 
-The A2 screens run entirely in the browser on demo data, so no backend work is
-needed for them. Login still uses the real API.
+The A2 screens follow the design prototype and run entirely in the browser on demo
+data. Login still uses the real API.
 
-- `client/src/mockData.js`: demo services, queues, history and notifications
-- `client/src/queueLogic.js`: queue rules (ordering, positions, wait times, notifications)
-- `client/src/QueueContext.jsx`: shares that state with every screen through `useQueues()`,
-  saves it in localStorage and syncs it across tabs. Open the admin in one tab and the user
-  in another, and "Serve next" updates the user's screen live.
+- `client/src/mockData.js`: seed data (services, queues, Hao's ticket IT-024, history, updates)
+- `client/src/queueLogic.js`: queue rules and the simulation, with a simulated clock
+- `client/src/QueueContext.jsx`: one shared store (`useQueues()`), saved in localStorage and synced across tabs
 
-- [x] Login / Registration with client-side validation
-- [x] User Dashboard, Join Queue, Queue Status
-- [x] Admin Dashboard, Queue Management
-- [x] In-app notifications (bell in the nav bar)
-- [ ] Service Management (`pages/ServiceManagement.jsx`, see the TODO at the top)
-- [ ] History (`pages/History.jsx`, see the TODO at the top)
+Done:
+- [x] Sign in / Create account with inline validation
+- [x] App shell: header, nav, phone tab bar, footer with Reset demo, light/dark theme
+- [x] User: Overview (ticket + "While you wait" timeline + services), Services, service detail/join, My ticket (leave, served + confetti)
+- [x] Admin: Overview (open/close queues), Waiting lists (serve next, reorder, remove)
+- [x] Confirmation dialogs, toasts, empty states
+
+Teammate (see the TODO at the top of each file):
+- [ ] Service Management: list + create/edit form (`pages/ServiceManagement.jsx`)
+- [ ] History (`pages/History.jsx`)
+- [ ] Updates, for users and admins (`pages/Updates.jsx`)
 
 ## 1. Service management (admin)
 

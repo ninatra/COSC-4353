@@ -13,12 +13,22 @@ export default function VerifyEmail() {
   }, [token]);
 
   return (
-    <div className="card auth-card">
-      <h1>Email verification</h1>
-      {status.state === 'loading' && <p>Verifying…</p>}
-      {status.state === 'done' && <p>Your email is verified. You can close this page.</p>}
-      {status.state === 'error' && <p className="error">{status.message}</p>}
-      <Link to="/">Go to QueueSmart</Link>
-    </div>
+    <main id="main" className="wrap page">
+      <div className="panel verify-panel">
+        <h1 id="page-title" tabIndex={-1}>
+          Email verification
+        </h1>
+        {status.state === 'loading' && <p>Verifying…</p>}
+        {status.state === 'done' && <p>Your email is verified. You can close this page.</p>}
+        {status.state === 'error' && (
+          <p className="error" role="alert">
+            {status.message}
+          </p>
+        )}
+        <Link to="/" className="link-arrow">
+          Go to QueueSmart<span aria-hidden="true">&nbsp;→</span>
+        </Link>
+      </div>
+    </main>
   );
 }

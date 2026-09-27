@@ -1,22 +1,19 @@
 import { useState } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
-import AuthLayout from '../components/AuthLayout.jsx';
-import FormField, { errorProps } from '../components/FormField.jsx';
+import AuthFrame from '../components/AuthFrame.jsx';
+import FormField, { FieldError, fieldProps } from '../components/FormField.jsx';
 import { homePath } from '../components/ProtectedRoute.jsx';
-import { NAME_MAX, PASSWORD_MIN, validateRegister } from '../utils/validation.js';
+import { useToast } from '../components/Toast.jsx';
+import { focusFirstError, NAME_MAX, PASSWORD_MIN, validateRegister } from '../utils/validation.js';
+
+const FIELD_ORDER = ['name', 'email', 'password', 'confirmPassword', 'adminCode'];
 
 export default function Register() {
   const { user, register } = useAuth();
   const navigate = useNavigate();
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: 'USER',
-    adminCode: '',
-  });
+  const toast = useToast();
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '', role: 'USER', adminCode: '' });
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -33,12 +30,15 @@ export default function Register() {
     setServerError('');
     const found = validateRegister(form);
     setErrors(found);
-    if (Object.keys(found).length > 0) return;
-
+    if (Object.keys(found).length) {
+      focusFirstError(found, FIELD_ORDER);
+      return;
+    }
     setSubmitting(true);
     try {
       const { confirmPassword, ...payload } = form;
       const created = await register({ ...payload, name: form.name.trim(), email: form.email.trim() });
+      toast('Account created');
       navigate(homePath(created));
     } catch (err) {
       setServerError(err.message);
@@ -47,79 +47,77 @@ export default function Register() {
     }
   }
 
+  const passwordHint = `At least ${PASSWORD_MIN} characters.`;
+
   return (
-    <AuthLayout>
-      <form className="card auth-card" onSubmit={handleSubmit} noValidate>
-        <h1>Create an account</h1>
-        {serverError && <p className="error" role="alert">{serverError}</p>}
-        <FormField label="Full name" id="name" error={errors.name}>
-          <input
-            id="name"
-            autoComplete="name"
-            maxLength={NAME_MAX}
-            value={form.name}
-            onChange={update('name')}
-            {...errorProps('name', errors.name)}
-          />
+    <AuthFrame
+      title="Create an account"
+      footer={
+        <>
+          Already have an account? <Link to="/login">Sign in</Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} noValidate>
+        {serverError && (
+          <div role="alert" className="form-alert">
+            <FieldError>{serverError}</FieldError>
+          </div>
+        )}
+        <FormField id="name" label="Full name" error={errors.name}>
+          <input autoComplete="name" maxLength={NAME_MAX} value={form.name} onChange={update('name')} {...fieldProps('name', { error: errors.name })} />
         </FormField>
-        <FormField label="Email" hint="(this is your username)" id="email" error={errors.email}>
+        <FormField id="email" label="Email" hint="This is your username." error={errors.email}>
           <input
-            id="email"
             type="email"
             autoComplete="email"
+            placeholder="name@school.edu"
             value={form.email}
             onChange={update('email')}
-            {...errorProps('email', errors.email)}
+            {...fieldProps('email', { error: errors.email, hint: true })}
           />
         </FormField>
-        <FormField
-          label="Password"
-          hint={`(at least ${PASSWORD_MIN} characters, with a letter and a number)`}
-          id="password"
-          error={errors.password}
-        >
+        <FormField id="password" label="Password" hint={passwordHint} error={errors.password}>
           <input
-            id="password"
             type="password"
             autoComplete="new-password"
             value={form.password}
             onChange={update('password')}
-            {...errorProps('password', errors.password)}
+            {...fieldProps('password', { error: errors.password, hint: true })}
           />
         </FormField>
-        <FormField label="Confirm password" id="confirmPassword" error={errors.confirmPassword}>
+        <FormField id="confirmPassword" label="Confirm password" error={errors.confirmPassword}>
           <input
-            id="confirmPassword"
             type="password"
             autoComplete="new-password"
             value={form.confirmPassword}
             onChange={update('confirmPassword')}
-            {...errorProps('confirmPassword', errors.confirmPassword)}
+            {...fieldProps('confirmPassword', { error: errors.confirmPassword })}
           />
         </FormField>
-        <FormField label="Account type" id="role">
-          <select id="role" value={form.role} onChange={update('role')}>
-            <option value="USER">User (join queues)</option>
-            <option value="ADMIN">Administrator (manage services)</option>
-          </select>
-        </FormField>
+        <fieldset className="field">
+          <legend>Account type</legend>
+          <div className="radio-seg">
+            {[
+              ['USER', 'User'],
+              ['ADMIN', 'Administrator'],
+            ].map(([value, label]) => (
+              <label key={value}>
+                <input type="radio" name="role" value={value} checked={form.role === value} onChange={update('role')} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
         {form.role === 'ADMIN' && (
-          <FormField label="Administrator code" id="adminCode" error={errors.adminCode}>
-            <input
-              id="adminCode"
-              value={form.adminCode}
-              onChange={update('adminCode')}
-              {...errorProps('adminCode', errors.adminCode)}
-            />
+          <FormField id="adminCode" label="Administrator code" error={errors.adminCode}>
+            <input value={form.adminCode} onChange={update('adminCode')} {...fieldProps('adminCode', { error: errors.adminCode })} />
           </FormField>
         )}
-        <button type="submit" disabled={submitting}>
-          {submitting ? 'Creating account…' : 'Register'}
+        <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Create account'}
         </button>
-        <p className="muted">
-          Already registered? <Link to="/login">Log in</Link>
-        </p>
       </form>
-    </AuthLayout>
+    </AuthFrame>
   );
 }

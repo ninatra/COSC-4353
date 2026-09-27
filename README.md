@@ -67,12 +67,21 @@ Useful commands:
 - `npm run db:studio -w server` opens a browser UI for viewing and editing the database.
 - To reset the database, delete `server/prisma/dev.db` and run `npm run setup`.
 
+## Front End (A2)
+
+- **Stack:** React + Vite with plain CSS (design tokens in `client/src/index.css`, light and dark themes) and lucide-react icons. React gives us reusable components for the ticket, service cards and dialogs; Vite keeps development fast; plain CSS with custom properties keeps the design system in one place without a UI kit.
+- **Mock data and simulation:** queue data is sample data kept in the browser (localStorage), not the server. A simulated clock starts at 10:05 AM and moves forward a few minutes with each action. Joining, leaving, serving, reordering and removing all update every screen and write to Updates.
+- **Wait estimate:** people ahead × the service's expected visit length. This is a deliberate simplification for the demo.
+- **Sign in** uses the real API and database; everything after sign-in uses the mock data. Use **Reset demo** in the footer to restore the sample data.
+
 ## Project Structure
 
 ```
 client/   React web app (Vite)
-  src/pages/        Login, Register, User and Admin dashboards
+  src/pages/        One file per screen (user and admin)
+  src/components/   Shared UI: app shell, ticket, service cards, dialogs
   src/AuthContext   Keeps track of the logged-in user
+  src/QueueContext  Shared mock queue data for the A2 screens
 server/   Express REST API
   prisma/           Database schema and demo data
   src/routes/       API endpoints (/api/auth, ...)

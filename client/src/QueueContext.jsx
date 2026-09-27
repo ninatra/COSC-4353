@@ -1,32 +1,35 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { createMockState } from './mockData.js';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
+import { seed, STATE_VERSION } from './mockData.js';
 import { actions } from './queueLogic.js';
 
-// Holds the mock queue data for the whole app. It is saved in localStorage so
-// it survives page reloads, and syncs between tabs: log in as the admin in one
-// tab and as the user in another to watch "Serve next" update the user's screen.
-const STORAGE_KEY = 'queuesmart_mock_state_v1';
+// One shared store for every screen, so user and admin views always agree.
+// It is saved in localStorage (never passwords) and syncs between tabs: sign in
+// as the admin in one tab and as the user in another to watch "Serve next" live.
+const STORAGE_KEY = 'queuesmart_demo_v3';
 
 const QueueContext = createContext(null);
 
-function loadState() {
+function load() {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (saved?.v === STATE_VERSION) return saved;
   } catch {
-    // Storage blocked or corrupt: fall back to fresh demo data.
+    // Storage blocked or corrupt: start from the seed data.
   }
-  return createMockState();
+  return seed();
 }
 
 export function QueueProvider({ children }) {
-  const [state, setState] = useState(loadState);
+  const [state, setState] = useState(load);
+  // Latest state, so an action can return its message synchronously.
+  const latest = useRef(state);
 
   useEffect(() => {
+    latest.current = state;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch {
-      // Not saved; the app still works for this page load.
+      // Not saved; the demo still works for this page load.
     }
   }, [state]);
 
@@ -34,7 +37,9 @@ export function QueueProvider({ children }) {
     function onStorage(event) {
       if (event.key !== STORAGE_KEY || !event.newValue) return;
       try {
-        setState(JSON.parse(event.newValue));
+        const next = JSON.parse(event.newValue);
+        latest.current = next;
+        setState(next);
       } catch {
         // Ignore a bad value written by another tab.
       }
@@ -43,28 +48,33 @@ export function QueueProvider({ children }) {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  // Each action gets a copy of the state to change, so React sees a new object.
+  // Each action runs on a copy of the state and returns its toast message, if any.
   const run =
     (name) =>
-    (...args) =>
-      setState((prev) => {
-        const draft = structuredClone(prev);
-        actions[name](draft, ...args);
-        return draft;
-      });
+    (...args) => {
+      const draft = structuredClone(latest.current);
+      const message = actions[name](draft, ...args);
+      latest.current = draft;
+      setState(draft);
+      return message;
+    };
 
   const value = {
     state,
-    joinQueue: run('joinQueue'),
-    leaveQueue: run('leaveQueue'),
+    join: run('join'),
+    leave: run('leave'),
     serveNext: run('serveNext'),
-    moveEntry: run('moveEntry'),
-    removeEntry: run('removeEntry'),
-    setServiceOpen: run('setServiceOpen'),
-    addService: run('addService'),
-    updateService: run('updateService'),
-    markNotificationsRead: run('markNotificationsRead'),
-    resetDemoData: () => setState(createMockState()),
+    move: run('move'),
+    removeVisitor: run('removeVisitor'),
+    toggleOpen: run('toggleOpen'),
+    saveService: run('saveService'),
+    clearUpdates: run('clearUpdates'),
+    dismissTicket: run('dismissTicket'),
+    markCelebrated: run('markCelebrated'),
+    resetDemo: () => {
+      latest.current = seed();
+      setState(latest.current);
+    },
   };
 
   return <QueueContext.Provider value={value}>{children}</QueueContext.Provider>;

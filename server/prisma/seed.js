@@ -21,9 +21,9 @@ async function main() {
   });
   await prisma.user.upsert({
     where: { email: 'user@queuesmart.dev' },
-    update: {},
+    update: { name: 'Hao Nguyen' },
     create: {
-      name: 'Demo User',
+      name: 'Hao Nguyen',
       email: 'user@queuesmart.dev',
       passwordHash,
       role: 'USER',

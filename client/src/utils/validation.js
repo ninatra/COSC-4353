@@ -1,34 +1,45 @@
-// Client-side form checks. Each returns an object of { field: message } for
-// the fields that are invalid; an empty object means the form is valid.
+// Client-side form checks. Each returns { field: 'message' } for invalid fields;
+// an empty object means the form is valid. Whitespace-only counts as empty.
 
-export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 export const NAME_MAX = 50;
 export const PASSWORD_MIN = 8;
 
+function checkEmail(email) {
+  if (!email.trim()) return 'Enter your email address.';
+  if (!EMAIL_PATTERN.test(email.trim())) return 'Enter a valid email address, like name@school.edu.';
+  return undefined;
+}
+
 export function validateLogin({ email, password }) {
   const errors = {};
-  if (!email.trim()) errors.email = 'Email is required.';
-  else if (!EMAIL_PATTERN.test(email.trim())) errors.email = 'Enter a valid email address.';
-  if (!password) errors.password = 'Password is required.';
+  const emailError = checkEmail(email);
+  if (emailError) errors.email = emailError;
+  if (!password.trim()) errors.password = 'Enter your password.';
   return errors;
 }
 
 export function validateRegister({ name, email, password, confirmPassword, role, adminCode }) {
   const errors = {};
-  if (!name.trim()) errors.name = 'Full name is required.';
-  else if (name.trim().length > NAME_MAX) errors.name = `Name must be ${NAME_MAX} characters or fewer.`;
+  if (!name.trim()) errors.name = 'Enter your full name.';
+  else if (name.trim().length > NAME_MAX) errors.name = `Keep your name to ${NAME_MAX} characters or fewer.`;
 
-  if (!email.trim()) errors.email = 'Email is required.';
-  else if (!EMAIL_PATTERN.test(email.trim())) errors.email = 'Enter a valid email address.';
+  const emailError = checkEmail(email);
+  if (emailError) errors.email = emailError;
 
-  if (!password) errors.password = 'Password is required.';
-  else if (password.length < PASSWORD_MIN) errors.password = `Password must be at least ${PASSWORD_MIN} characters.`;
-  else if (!/[A-Za-z]/.test(password) || !/\d/.test(password))
-    errors.password = 'Password must include at least one letter and one number.';
+  if (!password.trim()) errors.password = 'Enter a password.';
+  else if (password.length < PASSWORD_MIN)
+    errors.password = `Use at least ${PASSWORD_MIN} characters. This one has ${password.length}.`;
 
-  if (!confirmPassword) errors.confirmPassword = 'Please confirm your password.';
-  else if (confirmPassword !== password) errors.confirmPassword = 'Passwords do not match.';
+  if (!confirmPassword) errors.confirmPassword = 'Enter your password again.';
+  else if (confirmPassword !== password) errors.confirmPassword = "The passwords don't match.";
 
-  if (role === 'ADMIN' && !adminCode.trim()) errors.adminCode = 'Administrator code is required.';
+  if (role === 'ADMIN' && !adminCode.trim()) errors.adminCode = 'Enter the administrator code.';
   return errors;
+}
+
+// Focuses the first invalid field, in the order the fields appear.
+export function focusFirstError(errors, order) {
+  const first = order.find((field) => errors[field]);
+  if (first) document.getElementById(first)?.focus();
 }
