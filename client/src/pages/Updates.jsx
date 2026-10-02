@@ -1,35 +1,74 @@
-// TODO (teammate): Updates screen, shared by users (/updates) and admins (/admin/updates).
-//
-// - Audience: user.role === 'ADMIN' ? 'admin' : user.email
-// - Head row: eyebrow ("Administrator" or "Activity"), <h1 id="page-title" tabIndex={-1}>Updates</h1>,
-//   and a "Clear all" button (btn btn-secondary btn-sm) when the list isn't empty.
-//   Clear all asks first with useConfirm():
-//     title "Clear all updates?", body "This empties the Updates list. Your ticket and
-//     history are not affected.", confirmLabel "Clear updates"
-//   then calls clearUpdates(audience) from useQueues().
-// - Lead: users "Confirmations, position changes, and status changes for your tickets,
-//   newest first." / admins "Queue activity across every service, newest first." followed by
-//   "Times come from the demo clock. Nothing is sent by email or text."
-// - List: <p className="day-label">Today · {DEMO_DATE}</p> then <ol className="ulist">, one
-//   <li className="uitem"> per update: a tinted tile with an icon by kind, <h3>{title}</h3>,
-//   <p>{fillService(state, body, serviceId)}</p>, and <time>{fmtTime(t)}</time>.
-//   Icons by kind: confirmed ticket/blue, joined user-plus/blue, position arrow-up/blue,
-//   almost bell-ring/sun, served circle-check/mint, left log-out/peach, removed user-minus/peach,
-//   closed lock/peach, opened lock-open/mint, edit pencil/lilac, created plus/lilac,
-//   wait clock/sun, reorder list-ordered/lilac.
-// - Empty state: title "All caught up".
-//
-// Data: updatesFor(state, audience) and fillService() from '../queueLogic.js' (already newest first).
-// Design reference: the prototype's vUpdates().
+import { useAuth } from '../AuthContext.jsx';
+import EmptyState from '../components/EmptyState.jsx';
+import Icon from '../components/Icon.jsx';
+import { DEMO_DATE } from '../mockData.js';
+import { fillService, notificationsFor, updatesFor } from '../queueLogic.js';
+import { useQueues } from '../QueueContext.jsx';
+import { fmtTime } from '../utils/format.js';
+
+const UPDATE_STYLE = {
+  confirmed: ['ticket', 'blue'], joined: ['user-plus', 'blue'], position: ['arrow-up', 'blue'],
+  almost: ['bell-ring', 'sun'], served: ['circle-check', 'mint'], left: ['log-out', 'peach'],
+  removed: ['user-minus', 'peach'], closed: ['lock', 'peach'], opened: ['lock-open', 'mint'],
+  edit: ['pencil', 'lilac'], created: ['plus', 'lilac'], wait: ['clock', 'sun'], reorder: ['list-ordered', 'lilac'],
+};
 
 export default function Updates() {
+  const { user } = useAuth();
+  const { state, markUpdateRead, markAllUpdatesRead } = useQueues();
+  const isAdmin = user.role === 'ADMIN';
+  const audience = isAdmin ? 'admin' : user.email;
+  const updates = updatesFor(state, audience);
+  const unread = new Set(notificationsFor(state, audience).map((update) => update.n));
+
   return (
     <>
-      <p className="eyebrow">Activity</p>
-      <h1 id="page-title" tabIndex={-1}>
-        Updates
-      </h1>
-      <p className="lead">This screen is under construction.</p>
+      <div className="head-row notification-page-head">
+        <div>
+          <p className="eyebrow">{isAdmin ? 'Administrator' : 'Activity'}</p>
+          <h1 id="page-title" tabIndex={-1}>Notifications</h1>
+        </div>
+        {unread.size > 0 && (
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => markAllUpdatesRead(audience)}>
+            Mark all as read
+          </button>
+        )}
+      </div>
+      <p className="lead">
+        {isAdmin ? 'Detailed queue activity across every service, newest first.' : 'Detailed updates about your queue visits, newest first.'}
+      </p>
+      {!updates.length ? (
+        <EmptyState title="All caught up" body="New queue updates and service notices will appear here." />
+      ) : (
+        <>
+          <p className="day-label">Today · {DEMO_DATE}</p>
+          <ol className="ulist">
+            {updates.map((update) => {
+              const [icon, tint] = UPDATE_STYLE[update.kind] ?? ['info', 'blue'];
+              return (
+                <li className={`uitem ${unread.has(update.n) ? 'is-unread' : ''}`} key={update.n}>
+                  <span className={`tile tint-${tint}`} aria-hidden="true"><Icon name={icon} /></span>
+                  <div>
+                    <h3>
+                      {unread.has(update.n) && <span className="unread-dot" aria-label="Unread" />}
+                      {update.title}
+                    </h3>
+                    <p>{fillService(state, update.body, update.serviceId)}</p>
+                  </div>
+                  <div className="uitem-meta">
+                    <time>{fmtTime(update.t)}</time>
+                    {unread.has(update.n) && (
+                      <button type="button" className="notification-read" onClick={() => markUpdateRead(audience, update.n)}>
+                        Mark as read
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
     </>
   );
 }

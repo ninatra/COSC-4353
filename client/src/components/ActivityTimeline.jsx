@@ -1,5 +1,5 @@
 import { useAuth } from '../AuthContext.jsx';
-import { fillService, ticketOf, updatesFor } from '../queueLogic.js';
+import { ticketOf, updatesFor } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
 import { fmtTime } from '../utils/format.js';
 import Icon from './Icon.jsx';
@@ -16,7 +16,7 @@ const KIND_DOT = {
   wait: 'var(--ticket)',
 };
 
-function TimelineItem({ title, body, time, variant, dot }) {
+function TimelineItem({ title, time, variant, dot }) {
   return (
     <li className={`tl-item ${variant ?? ''}`} style={dot ? { '--dot': dot } : undefined}>
       <span className="tl-dot" aria-hidden="true" />
@@ -25,7 +25,6 @@ function TimelineItem({ title, body, time, variant, dot }) {
           <span className="tl-title">{title}</span>
           <span className="tl-time">{time}</span>
         </div>
-        <p>{body}</p>
       </div>
     </li>
   );
@@ -59,7 +58,7 @@ export default function ActivityTimeline() {
       <>
         <ol className="timeline">
           {recent.map((u, i) => (
-            <TimelineItem key={u.n} title={u.title} body={fillService(state, u.body, u.serviceId)} time={fmtTime(u.t)} variant={i === 0 ? 'latest' : ''} dot={KIND_DOT[u.kind]} />
+            <TimelineItem key={u.n} title={u.title} time={fmtTime(u.t)} variant={i === 0 ? 'latest' : ''} dot={KIND_DOT[u.kind]} />
           ))}
         </ol>
         {note}
@@ -72,13 +71,13 @@ export default function ActivityTimeline() {
     <>
       <ol className="timeline">
         {events.map((u, i) => (
-          <TimelineItem key={u.n} title={u.title} body={fillService(state, u.body, u.serviceId)} time={fmtTime(u.t)} variant={i === events.length - 1 ? 'latest' : ''} dot={KIND_DOT[u.kind]} />
+          <TimelineItem key={u.n} title={u.title} time={fmtTime(u.t)} variant={i === events.length - 1 ? 'latest' : ''} dot={KIND_DOT[u.kind]} />
         ))}
         {ticket.status === 'waiting' && !events.some((u) => u.kind === 'almost') && (
-          <TimelineItem title="Almost ready" body="Flagged when one person is ahead of you." time="Upcoming" variant="upcoming" />
+          <TimelineItem title="Almost ready" time="Upcoming" variant="upcoming" />
         )}
         {ticket.status === 'waiting' && (
-          <TimelineItem title="Visit completed" body="Marked when staff finish helping you." time="Upcoming" variant="upcoming" />
+          <TimelineItem title="Visit completed" time="Upcoming" variant="upcoming" />
         )}
       </ol>
       {note}

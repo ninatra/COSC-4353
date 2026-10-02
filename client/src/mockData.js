@@ -18,11 +18,11 @@ function seedUpdates() {
   up(540, 'admin', 'opened', 'Queue opened', '{svc} opened for walk-ins.', { serviceId: 'it' });
   up(545, 'admin', 'opened', 'Queue opened', '{svc} opened for walk-ins.', { serviceId: 'aa' });
   up(572, 'admin', 'closed', 'Queue closed', '{svc} closed to new visitors. 1 visitor kept their place.', { serviceId: 'ss' });
-  up(588, DEMO_EMAIL, 'confirmed', 'Ticket confirmed', 'IT-024 is saved for {svc}.', { serviceId: 'it', ticketId: 'IT-024' });
-  up(588, DEMO_EMAIL, 'joined', 'Queue joined', 'You joined at position 04. Estimated wait was 24 min.', { serviceId: 'it', ticketId: 'IT-024' });
+  up(588, DEMO_EMAIL, 'confirmed', 'Ticket confirmed', "Your ticket IT-024 is confirmed for {svc}. You have joined the queue and you're #4 in line. The estimated wait is about 24 minutes. Please find a seat in the waiting area and we will see you soon.", { serviceId: 'it', ticketId: 'IT-024' });
+  up(588, DEMO_EMAIL, 'joined', 'Queue joined', 'You are currently #4 in the {svc} queue, with an estimated wait of about 24 minutes. We will update you as your position changes.', { serviceId: 'it', ticketId: 'IT-024' });
   up(588, 'admin', 'joined', 'Visitor joined', 'IT-024 joined {svc}. 4 waiting.', { serviceId: 'it' });
   up(603, 'admin', 'served', 'Visitor served', 'IT-021 was served at {svc}.', { serviceId: 'it' });
-  up(603, DEMO_EMAIL, 'position', 'Position changed', 'IT-021 was served. You moved from 04 to 03.', { serviceId: 'it', ticketId: 'IT-024' });
+  up(603, DEMO_EMAIL, 'position', 'Position changed', 'Your current position in line is #3. Your estimated wait is about 16 minutes. One visitor ahead of you was served, so please keep your phone nearby for the next update.', { serviceId: 'it', ticketId: 'IT-024' });
   return { updates, n };
 }
 

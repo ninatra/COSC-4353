@@ -87,7 +87,7 @@ export default function MyTicket() {
           ]
         : [
             ['map-pin', 'peach', `Stay within about 5 minutes of ${where}.`],
-            ['bell', 'blue', 'Position changes appear in Updates while this page is open.'],
+            ['bell', 'blue', 'Position changes appear in Notifications while this page is open.'],
             ['id-card', 'lilac', 'Have your student ID ready.'],
           ];
 

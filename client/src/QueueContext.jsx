@@ -69,6 +69,8 @@ export function QueueProvider({ children }) {
     toggleOpen: run('toggleOpen'),
     saveService: run('saveService'),
     clearUpdates: run('clearUpdates'),
+    markUpdateRead: run('markUpdateRead'),
+    markAllUpdatesRead: run('markAllUpdatesRead'),
     dismissTicket: run('dismissTicket'),
     markCelebrated: run('markCelebrated'),
     resetDemo: () => {

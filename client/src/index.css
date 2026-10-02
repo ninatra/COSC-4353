@@ -91,6 +91,25 @@ button { font: inherit; color: inherit; }
 .theme-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); background: var(--panel); display: grid; place-items: center; cursor: pointer; color: var(--text); }
 .theme-btn:hover { border-color: var(--border-strong); }
 .theme-btn .lucide { width: 17px; height: 17px; }
+.notification-btn { width: 38px; height: 38px; border-radius: 50%; border: 1px solid var(--border); background: var(--panel); display: grid; place-items: center; position: relative; color: var(--text); text-decoration: none; }
+.notification-btn:hover { border-color: var(--border-strong); }
+.notification-btn .lucide { width: 17px; height: 17px; }
+.notification-count { position: absolute; top: -4px; right: -4px; min-width: 17px; height: 17px; padding: 0 4px; border: 2px solid var(--bg); border-radius: 999px; background: var(--bad); color: #fff; font-size: 10px; font-weight: 700; line-height: 13px; text-align: center; }
+.notifications { position: relative; }
+.notification-popover { position: absolute; top: calc(100% + 10px); right: 0; z-index: 35; width: min(360px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 12px 32px rgba(0, 0, 0, .14); overflow: hidden; animation: rise .14s ease-out; }
+.notification-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.notification-head span { color: var(--muted); font-size: 12px; }
+.notification-list { list-style: none; max-height: 360px; overflow-y: auto; margin: 0; padding: 0; }
+.notification-item { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.notification-item strong { display: block; font-size: 14px; }
+.notification-item p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.notification-item time { display: block; margin-top: 2px; color: var(--muted); font-size: 12px; }
+.notification-dot { width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: var(--ticket); }
+.notification-read { border: 0; background: none; color: var(--link); cursor: pointer; font-size: 12px; font-weight: 700; padding: 2px 0; white-space: nowrap; }
+.notification-read:hover { text-decoration: underline; text-underline-offset: 3px; }
+.notification-empty { color: var(--muted); font-size: 14px; padding: 18px 16px; }
+.notification-all { display: block; padding: 12px 16px; color: var(--link); font-size: 13px; font-weight: 700; text-decoration: none; }
+.notification-all:hover { background: var(--bg); }
 
 /* ---------- Desktop nav ---------- */
 
@@ -219,7 +238,7 @@ h1 { font-size: 56px; line-height: 1; letter-spacing: -.035em; }
 /* ---------- Timeline ---------- */
 
 .side h2 { font-size: 22px; }
-.timeline { list-style: none; margin: 20px 0 0; padding: 0; }
+.timeline { list-style: none; max-height: 360px; overflow-y: auto; margin: 20px 0 0; padding: 0 8px 0 0; scrollbar-gutter: stable; }
 .tl-item { position: relative; padding: 0 0 20px 28px; animation: rise .3s ease-out both; }
 .tl-item::before { content: ''; position: absolute; left: 5px; top: 16px; bottom: -2px; width: 1.5px; background: var(--border); }
 .tl-item:last-child::before { display: none; }
@@ -376,8 +395,12 @@ td.num { font-variant-numeric: tabular-nums; font-weight: 600; }
 .uitem .tile { width: 40px; height: 40px; border-radius: 10px; }
 .uitem .tile .lucide { width: 18px; height: 18px; }
 .uitem h3 { font-family: var(--sans); font-size: 15px; font-weight: 700; letter-spacing: 0; }
+.uitem.is-unread { border-color: var(--t-mint-ink); box-shadow: inset 3px 0 0 var(--t-mint-ink); }
+.unread-dot { display: inline-block; width: 9px; height: 9px; margin: 0 8px 2px 0; border-radius: 50%; background: var(--t-mint-ink); vertical-align: middle; }
 .uitem p { font-size: 14px; color: var(--muted); margin-top: 2px; }
 .uitem time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 2px; }
+.uitem-meta { display: grid; justify-items: end; gap: 8px; }
+.notification-page-head { align-items: center; }
 .day-label { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-top: 32px; }
 
 /* ---------- Empty state ---------- */

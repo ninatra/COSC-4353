@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
-import { isWaiting } from '../queueLogic.js';
+import { fillService, isWaiting, notificationsFor } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
 import { useTheme } from '../useTheme.js';
 import { firstName, fmtTime, initials } from '../utils/format.js';
@@ -14,14 +14,14 @@ const USER_NAV = [
   ['/dashboard', 'Overview', 'house', 'Home'],
   ['/services', 'Services', 'layout-grid', 'Services'],
   ['/ticket', 'My ticket', 'ticket', 'Ticket'],
+  ['/updates', 'Notifications', 'bell', 'Notifications'],
   ['/history', 'History', 'history', 'History'],
-  ['/updates', 'Updates', 'bell', 'Updates'],
 ];
 const ADMIN_NAV = [
   ['/admin', 'Overview', 'layout-dashboard', 'Overview', true],
   ['/admin/services', 'Services', 'layout-grid', 'Services'],
   ['/admin/queues', 'Waiting lists', 'list-ordered', 'Lists'],
-  ['/admin/updates', 'Updates', 'bell', 'Updates'],
+  ['/admin/updates', 'Notifications', 'bell', 'Notifications'],
 ];
 
 export function Wordmark({ to }) {
@@ -48,6 +48,76 @@ export function ThemeButton() {
     <button type="button" className="theme-btn" onClick={toggle} aria-label={`Switch to ${isDark ? 'light' : 'dark'} theme`}>
       <Icon name={isDark ? 'sun' : 'moon'} />
     </button>
+  );
+}
+
+function NotificationButton({ isAdmin, userEmail, state, markUpdateRead }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+  const audience = isAdmin ? 'admin' : userEmail;
+  const notifications = notificationsFor(state, audience);
+  const hasNew = notifications.length > 0;
+  const path = isAdmin ? '/admin/updates' : '/updates';
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event) => {
+      if (!wrapRef.current?.contains(event.target)) setOpen(false);
+    };
+    const onKey = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <div className="notifications" ref={wrapRef}>
+      <button
+        type="button"
+        className="notification-btn"
+        aria-label={hasNew ? `Notifications, ${notifications.length} new` : 'Notifications'}
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <Icon name="bell" />
+        {hasNew && <span className="notification-count">{notifications.length}</span>}
+      </button>
+      {open && (
+        <div className="notification-popover" role="dialog" aria-label="Notifications">
+          <div className="notification-head">
+            <strong>Notifications</strong>
+            <span>{notifications.length ? `${notifications.length} new` : 'All caught up'}</span>
+          </div>
+          {notifications.length ? (
+            <ul className="notification-list">
+              {notifications.slice(0, 5).map((notification) => (
+                <li key={notification.n} className="notification-item">
+                  <span className="notification-dot" aria-hidden="true" />
+                  <div>
+                    <strong>{notification.title}</strong>
+                    <p>{fillService(state, notification.body, notification.serviceId)}</p>
+                    <time>{fmtTime(notification.t)}</time>
+                  </div>
+                  <button type="button" className="notification-read" onClick={() => markUpdateRead(audience, notification.n)}>
+                    Mark read
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="notification-empty">No new notifications.</p>
+          )}
+          <Link className="notification-all" to={path} onClick={() => setOpen(false)}>
+            View notification history
+          </Link>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -127,7 +197,7 @@ function AccountMenu({ user, isAdmin, onSignOut }) {
 
 export default function AppShell({ children }) {
   const { user, logout } = useAuth();
-  const { state, resetDemo } = useQueues();
+  const { state, resetDemo, markUpdateRead } = useQueues();
   const confirm = useConfirm();
   const toast = useToast();
   useFocusHeadingOnNavigate();
@@ -165,8 +235,9 @@ export default function AppShell({ children }) {
         <div className="wrap header-row">
           <Wordmark to={isAdmin ? '/admin' : '/dashboard'} />
           <div className="account">
-            <ThemeButton />
             {isAdmin && <span className="role-tag">Admin</span>}
+            <ThemeButton />
+            <NotificationButton isAdmin={isAdmin} userEmail={user.email} state={state} markUpdateRead={markUpdateRead} />
             <AccountMenu user={user} isAdmin={isAdmin} onSignOut={logout} />
           </div>
         </div>

@@ -50,6 +50,11 @@ export function updatesFor(state, audience) {
     .sort((a, b) => b.t - a.t || b.n - a.n);
 }
 
+export function notificationsFor(state, audience) {
+  const read = state.read?.[audience] ?? [];
+  return updatesFor(state, audience).filter((u) => !read.includes(u.n));
+}
+
 export const historyFor = (state, email) => state.history.filter((h) => h.email === email);
 
 // Replaces {svc} in update text with the service's current name.
@@ -75,7 +80,9 @@ function almostUpdate(draft, email, pos) {
     audience: email,
     kind: 'almost',
     title: 'Almost ready',
-    body: pos === 1 ? `You're next at {svc}. Head to ${where}.` : `One person is ahead of you. Start heading to ${where}.`,
+    body: pos === 1
+      ? `You're next at {svc}. Please come to ${where} now; you have 3 minutes before you may be removed from the queue.`
+      : `You're getting close. One person is ahead of you. Please be ready to come to ${where}.`,
     serviceId: ticket.serviceId,
     ticketId: ticket.id,
   });
@@ -99,7 +106,7 @@ function tracked(draft, serviceId, change, reason) {
       audience: email,
       kind: 'position',
       title: 'Position changed',
-      body: `${reason ? `${reason} ` : ''}You moved from ${pad(was)} to ${pad(after)}. ${rest}`,
+      body: `${reason ? `${reason} ` : ''}Your current position in line is ${pad(after)}. Your estimated wait is about ${(after - 1) * service.duration} minutes. ${rest}`,
       serviceId,
       ticketId: draft.tickets[email].id,
     });
@@ -143,8 +150,22 @@ export const actions = {
     const pos = line.length;
     draft.tickets[user.email] = { id, serviceId, status: 'waiting', joinedAt: draft.clock };
 
-    addUpdate(draft, { audience: user.email, kind: 'confirmed', title: 'Ticket confirmed', body: `${id} is saved for {svc}.`, serviceId, ticketId: id });
-    addUpdate(draft, { audience: user.email, kind: 'joined', title: 'Queue joined', body: `You joined at position ${pad(pos)}. Estimated wait is ${(pos - 1) * service.duration} min.`, serviceId, ticketId: id });
+    addUpdate(draft, {
+      audience: user.email,
+      kind: 'confirmed',
+      title: 'Ticket confirmed',
+      body: `Your ticket ${id} is confirmed for {svc}. You have joined the queue and you're #${pos} in line. The estimated wait is about ${(pos - 1) * service.duration} minutes. Please find a seat in the waiting area and we will see you soon.`,
+      serviceId,
+      ticketId: id,
+    });
+    addUpdate(draft, {
+      audience: user.email,
+      kind: 'joined',
+      title: 'Queue joined',
+      body: `You are currently #${pos} in the {svc} queue, with an estimated wait of about ${(pos - 1) * service.duration} minutes. We will update you as your position changes.`,
+      serviceId,
+      ticketId: id,
+    });
     if (pos <= ALMOST_READY_POSITION) almostUpdate(draft, user.email, pos);
     addUpdate(draft, { audience: 'admin', kind: 'joined', title: 'Visitor joined', body: `${id} joined {svc}. ${pos} waiting.`, serviceId });
     return `You're in line for ${service.name} · ${id}`;
@@ -160,7 +181,7 @@ export const actions = {
       if (index >= 0) line.splice(index, 1);
     }, 'A visitor ahead of you left the line.');
     recordHistory(draft, email, ticket.serviceId, 'left', ticket.id);
-    addUpdate(draft, { audience: email, kind: 'left', title: 'Left queue', body: `You left {svc}. Ticket ${ticket.id} was released.`, serviceId: ticket.serviceId, ticketId: ticket.id });
+    addUpdate(draft, { audience: email, kind: 'left', title: 'Left queue', body: `You left the {svc} queue. Ticket ${ticket.id} was released, so you are no longer waiting for service. You can join again whenever you are ready.`, serviceId: ticket.serviceId, ticketId: ticket.id });
     addUpdate(draft, { audience: 'admin', kind: 'left', title: 'Visitor left', body: `${ticket.id} left {svc}. ${line.length} waiting.`, serviceId: ticket.serviceId });
     delete draft.tickets[email];
     return 'You left the line. Your place was released.';
@@ -177,7 +198,7 @@ export const actions = {
       ticket.status = 'served';
       ticket.servedAt = draft.clock;
       recordHistory(draft, served.email, serviceId, 'served', served.id);
-      addUpdate(draft, { audience: served.email, kind: 'served', title: 'Visit completed', body: `Ticket ${served.id} was served at {svc}.`, serviceId, ticketId: served.id });
+      addUpdate(draft, { audience: served.email, kind: 'served', title: 'Visit completed', body: `You've been served at {svc}. Your visit for ticket ${served.id} is complete, and this queue entry has been added to your history.`, serviceId, ticketId: served.id });
     }
     addUpdate(draft, { audience: 'admin', kind: 'served', title: 'Visitor served', body: `${served.id} (${served.name}) was served at {svc}.`, serviceId });
     return `Served ${served.id} · ${served.name}`;
@@ -210,7 +231,7 @@ export const actions = {
     const ticket = visitor.email && draft.tickets[visitor.email];
     if (ticket?.id === visitor.id) {
       recordHistory(draft, visitor.email, serviceId, 'removed', visitor.id);
-      addUpdate(draft, { audience: visitor.email, kind: 'removed', title: 'Removed from queue', body: `Staff removed ticket ${visitor.id} from {svc}. If you rejoin, you start at the end of the line.`, serviceId, ticketId: visitor.id });
+      addUpdate(draft, { audience: visitor.email, kind: 'removed', title: 'Removed from queue', body: `Your ticket ${visitor.id} was removed from the {svc} queue because your service window expired. If you rejoin, you will start at the end of the line.`, serviceId, ticketId: visitor.id });
       delete draft.tickets[visitor.email];
     }
     addUpdate(draft, { audience: 'admin', kind: 'removed', title: 'Visitor removed', body: `${visitor.id} (${visitor.name}) was removed from {svc}.`, serviceId });
@@ -232,7 +253,7 @@ export const actions = {
     if (!service.open) {
       for (const [email, ticket] of Object.entries(draft.tickets)) {
         if (ticket.status === 'waiting' && ticket.serviceId === serviceId) {
-          addUpdate(draft, { audience: email, kind: 'closed', title: 'Service closed to new visitors', body: '{svc} stopped taking new visitors. Your place is kept.', serviceId, ticketId: ticket.id });
+          addUpdate(draft, { audience: email, kind: 'closed', title: 'Service closed to new visitors', body: `{svc} is no longer accepting new visitors, but your place is kept. You are still in line and will be notified when your position changes.`, serviceId, ticketId: ticket.id });
         }
       }
     }
@@ -258,7 +279,7 @@ export const actions = {
         for (const [email, ticket] of Object.entries(draft.tickets)) {
           if (ticket.status !== 'waiting' || ticket.serviceId !== serviceId) continue;
           const ahead = positionOf(draft, email) - 1;
-          addUpdate(draft, { audience: email, kind: 'wait', title: 'Wait estimate updated', body: `{svc} now expects ${values.duration} min per visit. Your estimate is ${ahead * values.duration} min.`, serviceId, ticketId: ticket.id });
+          addUpdate(draft, { audience: email, kind: 'wait', title: 'Wait estimate updated', body: `Your estimated wait for {svc} is now about ${ahead * values.duration} minutes because each visit is expected to take ${values.duration} minutes. Your position in line is unchanged.`, serviceId, ticketId: ticket.id });
         }
       }
       return `Saved ${values.name}`;
@@ -285,6 +306,19 @@ export const actions = {
   clearUpdates(draft, audience) {
     draft.cleared[audience] = draft.n;
     return 'Updates cleared';
+  },
+
+  markUpdateRead(draft, audience, updateNumber) {
+    const read = (draft.read ??= {});
+    const audienceRead = (read[audience] ??= []);
+    if (!audienceRead.includes(updateNumber)) audienceRead.push(updateNumber);
+    return undefined;
+  },
+
+  markAllUpdatesRead(draft, audience) {
+    const read = (draft.read ??= {});
+    read[audience] = updatesFor(draft, audience).map((update) => update.n);
+    return undefined;
   },
 
   // Clears a served ticket from the user's screens.
