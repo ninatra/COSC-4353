@@ -28,7 +28,7 @@ export function Wordmark({ to }) {
   const content = (
     <>
       <span className="qmark" aria-hidden="true">
-        q
+        <Icon name="ticket" />
       </span>
       QueueSmart
     </>

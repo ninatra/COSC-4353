@@ -1,4 +1,4 @@
-const COLORS = ['#283EE8', '#DFFF83', '#FFB68D', '#D0BCFF', '#8DDAB0'];
+const COLORS = ['#4A78D1', '#DFFF83', '#FFB68D', '#D0BCFF', '#8DDAB0'];
 
 // A short burst from the given element. Skipped when reduced motion is on.
 export function burstConfetti(anchor) {
