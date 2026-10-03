@@ -39,6 +39,7 @@ export default function App() {
         <Route path="/admin/services/:serviceId/edit" element={<ServiceManagement />} />
         <Route path="/admin/queues" element={<WaitingLists />} />
         <Route path="/admin/queues/:serviceId" element={<WaitingLists />} />
+        <Route path="/admin/history" element={<History />} />
         <Route path="/admin/updates" element={<Updates />} />
       </Route>
 

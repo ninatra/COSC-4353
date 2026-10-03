@@ -33,9 +33,9 @@ export function seed() {
     clock: 605,
     n,
     services: [
-      { id: 'it', name: 'IT Help Desk', desc: 'Wi-Fi, account access, and device support.', duration: 8, priority: 'high', open: true, location: 'Fondren Library, Room 112', icon: 'laptop', tint: 'blue', prefix: 'IT' },
-      { id: 'aa', name: 'Academic Advising', desc: 'Course planning and degree requirements.', duration: 15, priority: 'medium', open: true, location: 'Lovett Hall, Suite 210', icon: 'graduation-cap', tint: 'lilac', prefix: 'AA' },
-      { id: 'ss', name: 'Student Services', desc: 'ID cards, enrollment verification, and records requests.', duration: 10, priority: 'low', open: false, location: 'Allen Center, Room 104', icon: 'id-card', tint: 'peach', prefix: 'SS' },
+      { id: 'it', name: 'IT Help Desk', desc: 'Wi-Fi, account access, and device support.', duration: 8, priority: 'high', open: true, location: 'Fondren Library, Room 112', contact: 'it@university.edu', hours: 'Mon-Fri, 8:00 AM-5:00 PM', category: 'Technology', maxCapacity: 12, instructions: 'Bring your device and university ID if you need account or hardware help.', icon: 'laptop', tint: 'blue', prefix: 'IT' },
+      { id: 'aa', name: 'Academic Advising', desc: 'Course planning and degree requirements.', duration: 15, priority: 'medium', open: true, location: 'Lovett Hall, Suite 210', contact: 'advising@university.edu', hours: 'Mon-Thu, 9:00 AM-4:00 PM', category: 'Academic', maxCapacity: 8, instructions: 'Have your degree plan and questions ready before visiting.', icon: 'graduation-cap', tint: 'lilac', prefix: 'AA' },
+      { id: 'ss', name: 'Student Services', desc: 'ID cards, enrollment verification, and records requests.', duration: 10, priority: 'low', open: false, location: 'Allen Center, Room 104', contact: 'studentservices@university.edu', hours: 'Mon-Fri, 8:30 AM-4:30 PM', category: 'Student support', maxCapacity: null, instructions: 'Bring a photo ID and any forms needed for your request.', icon: 'id-card', tint: 'peach', prefix: 'SS' },
     ],
     // serviceId -> ordered waiting list. `email` marks visitors who have an account.
     queues: {

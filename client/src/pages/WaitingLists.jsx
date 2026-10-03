@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
 import EmptyState from '../components/EmptyState.jsx';
@@ -12,11 +13,16 @@ import { fmtTime, hashTint, initials, pad, people } from '../utils/format.js';
 
 export default function WaitingLists() {
   const { serviceId } = useParams();
-  const { state, serveNext, move, removeVisitor } = useQueues();
+  const { state, serveNext, move, moveTo, removeVisitor } = useQueues();
   const navigate = useNavigate();
   const confirm = useConfirm();
   const toast = useToast();
   const focusLater = useFocusAfterRender();
+  const [draggedId, setDraggedId] = useState(null);
+  const [dropIndex, setDropIndex] = useState(null);
+  const [servingVisitor, setServingVisitor] = useState(null);
+  const [completion, setCompletion] = useState({ outcome: 'completed', problem: '', notes: '' });
+  const serveDialogRef = useRef(null);
 
   const service = findService(state, serviceId) ?? state.services[0];
   const heading = (
@@ -38,9 +44,24 @@ export default function WaitingLists() {
 
   const line = queueOf(state, service.id);
 
-  function handleServe() {
-    toast(serveNext(service.id));
+  useEffect(() => {
+    if (!servingVisitor) return;
+    serveDialogRef.current?.showModal();
+  }, [servingVisitor]);
+
+  function handleServeSubmit(event) {
+    event.preventDefault();
+    serveDialogRef.current?.close();
+    toast(serveNext(service.id, completion));
+    setServingVisitor(null);
+    setCompletion({ outcome: 'completed', problem: '', notes: '' });
     focusLater(line.length > 1 ? 'serve-next' : 'page-title');
+  }
+
+  function handleServeCancel() {
+    serveDialogRef.current?.close();
+    setServingVisitor(null);
+    setCompletion({ outcome: 'completed', problem: '', notes: '' });
   }
 
   // Keep focus on the moved row; at the top or bottom, switch to the other arrow.
@@ -52,6 +73,30 @@ export default function WaitingLists() {
     const otherArrow = direction < 0 ? 'down' : 'up';
     focusLater(`${atEdge ? otherArrow : sameArrow}-${visitor.id}`);
   }
+
+  function handleDrop() {
+    if (!draggedId) return;
+    const from = line.findIndex((visitor) => visitor.id === draggedId);
+    if (dropIndex !== null && dropIndex !== from) moveTo(service.id, draggedId, dropIndex);
+    setDraggedId(null);
+    setDropIndex(null);
+  }
+
+  function handleDragEnd() {
+    setDraggedId(null);
+    setDropIndex(null);
+  }
+
+  const previewLine = draggedId && dropIndex !== null
+    ? (() => {
+        const next = [...line];
+        const from = next.findIndex((visitor) => visitor.id === draggedId);
+        if (from < 0 || from === dropIndex) return next;
+        const [visitor] = next.splice(from, 1);
+        next.splice(dropIndex, 0, visitor);
+        return next;
+      })()
+    : line;
 
   async function handleRemove(visitor, index) {
     const ok = await confirm({
@@ -94,16 +139,76 @@ export default function WaitingLists() {
             <span>{service.duration} min per visit</span>
           </p>
         </div>
-        <button type="button" className="btn btn-primary" id="serve-next" onClick={handleServe} disabled={!line.length}>
+        <button type="button" className="btn btn-primary" id="serve-next" onClick={() => setServingVisitor(line[0])} disabled={!line.length}>
           <Icon name="circle-check" />
           Serve next{line.length ? ` · ${line[0].id}` : ''}
         </button>
       </div>
 
+      <dialog ref={serveDialogRef} onCancel={handleServeCancel}>
+        {servingVisitor && (
+          <form className="dlg-inner serve-form" onSubmit={handleServeSubmit}>
+            <h2>Complete visit</h2>
+            <p>{servingVisitor.name} · <span className="mono">{servingVisitor.id}</span></p>
+            <label htmlFor="visit-problem">Problem</label>
+            <textarea
+              id="visit-problem"
+              required
+              value={completion.problem}
+              onChange={(event) => setCompletion({ ...completion, problem: event.target.value })}
+              placeholder="What did the student need help with?"
+            />
+            <label htmlFor="visit-outcome">Outcome</label>
+            <select
+              id="visit-outcome"
+              value={completion.outcome}
+              onChange={(event) => setCompletion({ ...completion, outcome: event.target.value })}
+            >
+              <option value="completed">Completed</option>
+              <option value="referred">Referred elsewhere</option>
+              <option value="unresolved">Unresolved</option>
+              <option value="follow-up">Follow-up needed</option>
+            </select>
+            <label htmlFor="visit-notes">Notes <span className="muted">(optional)</span></label>
+            <textarea
+              id="visit-notes"
+              value={completion.notes}
+              onChange={(event) => setCompletion({ ...completion, notes: event.target.value })}
+              placeholder="Add a brief outcome or follow-up note"
+            />
+            <div className="dlg-actions">
+              <button type="button" className="btn btn-secondary" onClick={handleServeCancel}>Cancel</button>
+              <button type="submit" className="btn btn-primary">Complete visit</button>
+            </div>
+          </form>
+        )}
+      </dialog>
+
       {line.length ? (
         <ol className="qlist" aria-label={`${service.name} waiting list`}>
-          {line.map((v, i) => (
-            <li key={v.id} className={`qrow ${i === 0 ? 'is-next' : ''} ${v.email ? 'is-you' : ''}`}>
+          {previewLine.map((v, i) => (
+            <li
+              key={v.id}
+              className={`qrow ${i === 0 ? 'is-next' : ''} ${v.email ? 'is-you' : ''} ${draggedId === v.id ? 'is-dragging' : ''}`}
+              draggable
+              onDragStart={(event) => {
+                event.dataTransfer.effectAllowed = 'move';
+                event.dataTransfer.setData('text/plain', v.id);
+                setDraggedId(v.id);
+              }}
+              onDragEnd={handleDragEnd}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (v.id === draggedId) return;
+                const from = line.findIndex((visitor) => visitor.id === draggedId);
+                const target = line.findIndex((visitor) => visitor.id === v.id);
+                const beforeTarget = event.clientY < event.currentTarget.getBoundingClientRect().top + event.currentTarget.offsetHeight / 2;
+                const rawIndex = target + (beforeTarget ? 0 : 1);
+                const destination = rawIndex > from ? rawIndex - 1 : rawIndex;
+                if (destination !== from) setDropIndex(destination);
+              }}
+              onDrop={handleDrop}
+            >
               <span className="qpos" aria-hidden="true">
                 {pad(i + 1)}
               </span>
@@ -155,6 +260,7 @@ export default function WaitingLists() {
         </ol>
       ) : (
         <EmptyState
+          icon="users"
           title="Nobody is waiting"
           body={service.open ? 'New visitors appear here as soon as they join.' : 'This queue is closed, so nobody can join until you open it.'}
         />

@@ -3,9 +3,9 @@ import Icon from './Icon.jsx';
 // A labelled field with an optional hint, counter and inline error.
 // Pass the input as children and spread fieldProps(id, { error, hint }) on it
 // so screen readers link the hint and error to the input.
-export default function FormField({ id, label, hint, error, counter, suffix, children }) {
+export default function FormField({ id, label, hint, error, counter, suffix, className = '', children }) {
   return (
-    <div className={`field ${error ? 'has-error' : ''}`}>
+    <div className={`field ${className} ${error ? 'has-error' : ''}`}>
       <div className="label-row">
         <label htmlFor={id}>{label}</label>
         {counter}

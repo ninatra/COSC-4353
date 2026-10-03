@@ -52,7 +52,7 @@ export function updatesFor(state, audience) {
 
 export function notificationsFor(state, audience) {
   const read = state.read?.[audience] ?? [];
-  return updatesFor(state, audience).filter((u) => !read.includes(u.n));
+  return updatesFor(state, audience).filter((u) => u.notify !== false && !read.includes(u.n));
 }
 
 export const historyFor = (state, email) => state.history.filter((h) => h.email === email);
@@ -101,12 +101,12 @@ function tracked(draft, serviceId, change, reason) {
     const after = positionOf(draft, email);
     const was = before[email];
     if (!was || !after || was === after) continue;
-    const rest = after === 1 ? "You're next." : `About ${(after - 1) * service.duration} min to go.`;
+    const positionNote = after === 1 ? " You're next." : '';
     addUpdate(draft, {
       audience: email,
       kind: 'position',
       title: 'Position changed',
-      body: `${reason ? `${reason} ` : ''}Your current position in line is ${pad(after)}. Your estimated wait is about ${(after - 1) * service.duration} minutes. ${rest}`,
+      body: `${reason ? `${reason} ` : ''}Your current position in line is ${pad(after)}. Your estimated wait is about ${(after - 1) * service.duration} minutes.${positionNote}`,
       serviceId,
       ticketId: draft.tickets[email].id,
     });
@@ -114,7 +114,7 @@ function tracked(draft, serviceId, change, reason) {
   }
 }
 
-function recordHistory(draft, email, serviceId, outcome, ticketId) {
+function recordHistory(draft, email, serviceId, outcome, ticketId, details = {}) {
   draft.history.unshift({
     email,
     date: DEMO_DATE,
@@ -123,6 +123,7 @@ function recordHistory(draft, email, serviceId, outcome, ticketId) {
     serviceName: findService(draft, serviceId).name,
     outcome,
     ticketId,
+    ...details,
   });
 }
 
@@ -132,6 +133,15 @@ function makePrefix(name) {
   return prefix.length < 2 ? `${prefix}X` : prefix;
 }
 
+function iconForCategory(category) {
+  return {
+    Academic: 'graduation-cap',
+    Financial: 'landmark',
+    Technology: 'laptop',
+    'Student support': 'id-card',
+  }[category] ?? 'building-2';
+}
+
 // ---------- Actions ----------
 
 export const actions = {
@@ -139,6 +149,7 @@ export const actions = {
   join(draft, serviceId, user) {
     const service = findService(draft, serviceId);
     if (!service?.open) return `${service?.name ?? 'This service'} is closed to new visitors.`;
+    if (service.maxCapacity && queueOf(draft, serviceId).length >= service.maxCapacity) return `${service.name} is currently at capacity.`;
     if (isWaiting(draft, user.email)) return 'You can hold one place at a time.';
 
     advance(draft, 1);
@@ -187,17 +198,21 @@ export const actions = {
     return 'You left the line. Your place was released.';
   },
 
-  serveNext(draft, serviceId) {
+  serveNext(draft, serviceId, completion = {}) {
     const line = queueOf(draft, serviceId);
     if (!line.length) return undefined;
     advance(draft, 3);
     const served = line[0];
     tracked(draft, serviceId, () => line.shift(), `${served.id} was served.`);
     const ticket = served.email && draft.tickets[served.email];
+    recordHistory(draft, served.email ?? null, serviceId, completion.outcome || 'completed', served.id, {
+      visitorName: served.name,
+      problem: completion.problem?.trim() || '',
+      notes: completion.notes?.trim() || '',
+    });
     if (ticket?.id === served.id) {
       ticket.status = 'served';
       ticket.servedAt = draft.clock;
-      recordHistory(draft, served.email, serviceId, 'served', served.id);
       addUpdate(draft, { audience: served.email, kind: 'served', title: 'Visit completed', body: `You've been served at {svc}. Your visit for ticket ${served.id} is complete, and this queue entry has been added to your history.`, serviceId, ticketId: served.id });
     }
     addUpdate(draft, { audience: 'admin', kind: 'served', title: 'Visitor served', body: `${served.id} (${served.name}) was served at {svc}.`, serviceId });
@@ -215,7 +230,18 @@ export const actions = {
       const [visitor] = line.splice(from, 1);
       line.splice(to, 0, visitor);
     }, 'Staff reordered the line.');
-    addUpdate(draft, { audience: 'admin', kind: 'reorder', title: 'Queue reordered', body: `${visitorId} moved to position ${pad(to + 1)} in {svc}.`, serviceId });
+    return undefined;
+  },
+
+  moveTo(draft, serviceId, visitorId, targetIndex) {
+    const line = queueOf(draft, serviceId);
+    const from = line.findIndex((visitor) => visitor.id === visitorId);
+    if (from < 0 || targetIndex < 0 || targetIndex >= line.length || from === targetIndex) return undefined;
+    advance(draft, 1);
+    tracked(draft, serviceId, () => {
+      const [visitor] = line.splice(from, 1);
+      line.splice(targetIndex, 0, visitor);
+    }, 'Staff reordered the line.');
     return undefined;
   },
 
@@ -261,7 +287,7 @@ export const actions = {
   },
 
   // For the Service Management screen.
-  // values = { name, desc, duration (number), priority: 'low'|'medium'|'high', open (new services only) }
+  // values contains the public service details and queue settings.
   // Pass serviceId to edit an existing service; leave it out to create one.
   saveService(draft, values, serviceId) {
     advance(draft, 1);
@@ -272,9 +298,27 @@ export const actions = {
       if (service.duration !== values.duration) changes.push(`expected duration ${service.duration} → ${values.duration} min`);
       if (service.desc !== values.desc) changes.push('description edited');
       if (service.priority !== values.priority) changes.push(`priority set to ${values.priority}`);
+      if (service.location !== values.location) changes.push('location edited');
+      if (service.contact !== values.contact) changes.push('contact information edited');
+      if (service.hours !== values.hours) changes.push('hours edited');
+      if (service.category !== values.category) changes.push('category changed');
+      if (service.maxCapacity !== values.maxCapacity) changes.push('capacity changed');
       const durationChanged = service.duration !== values.duration;
-      Object.assign(service, { name: values.name, desc: values.desc, duration: values.duration, priority: values.priority });
-      addUpdate(draft, { audience: 'admin', kind: 'edit', title: 'Service updated', body: `{svc}: ${changes.join(', ') || 'no changes'}.`, serviceId });
+      Object.assign(service, {
+        name: values.name,
+        desc: values.desc,
+        duration: values.duration,
+        priority: values.priority,
+        location: values.location,
+        contact: values.contact,
+        hours: values.hours,
+        category: values.category,
+        icon: iconForCategory(values.category),
+        maxCapacity: values.maxCapacity,
+        instructions: values.instructions,
+      });
+      delete service.appointmentRequired;
+      addUpdate(draft, { audience: 'admin', kind: 'edit', title: 'Service updated', body: `{svc}: ${changes.join(', ') || 'no changes'}.`, serviceId, notify: false });
       if (durationChanged) {
         for (const [email, ticket] of Object.entries(draft.tickets)) {
           if (ticket.status !== 'waiting' || ticket.serviceId !== serviceId) continue;
@@ -292,14 +336,41 @@ export const actions = {
       duration: values.duration,
       priority: values.priority,
       open: values.open,
-      icon: 'building-2',
+      location: values.location,
+      contact: values.contact,
+      hours: values.hours,
+      category: values.category,
+      icon: iconForCategory(values.category),
+      maxCapacity: values.maxCapacity,
+      instructions: values.instructions,
       tint: TINTS[draft.services.length % TINTS.length],
       prefix: makePrefix(values.name),
     });
     draft.queues[id] = [];
     draft.counters[id] = 1;
-    addUpdate(draft, { audience: 'admin', kind: 'created', title: 'Service created', body: `{svc} was created${values.open ? ' and is open.' : ' and is closed.'}`, serviceId: id });
+    addUpdate(draft, { audience: 'admin', kind: 'created', title: 'Service created', body: `{svc} was created${values.open ? ' and is open.' : ' and is closed.'}`, serviceId: id, notify: false });
     return `Created ${values.name}`;
+  },
+
+  deleteService(draft, serviceId) {
+    const service = findService(draft, serviceId);
+    if (!service) return undefined;
+    const waiting = queueOf(draft, serviceId).length;
+    if (waiting) return `Close or clear ${service.name} before deleting it.`;
+    draft.services = draft.services.filter((item) => item.id !== serviceId);
+    delete draft.queues[serviceId];
+    delete draft.counters[serviceId];
+    addUpdate(draft, { audience: 'admin', kind: 'deleted', title: 'Service deleted', body: `${service.name} was deleted.`, serviceId, notify: false });
+    return `Deleted ${service.name}`;
+  },
+
+  updateHistory(draft, historyIndex, changes) {
+    const entry = draft.history[historyIndex];
+    if (!entry) return undefined;
+    entry.outcome = changes.outcome;
+    entry.problem = changes.problem?.trim() || '';
+    entry.notes = changes.notes?.trim() || '';
+    return 'Visit history updated';
   },
 
   // For the Updates screen: hides everything currently listed for this audience.

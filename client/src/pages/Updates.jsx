@@ -5,6 +5,7 @@ import { DEMO_DATE } from '../mockData.js';
 import { fillService, notificationsFor, updatesFor } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
 import { fmtTime } from '../utils/format.js';
+import { useConfirm } from '../components/ConfirmDialog.jsx';
 
 const UPDATE_STYLE = {
   confirmed: ['ticket', 'blue'], joined: ['user-plus', 'blue'], position: ['arrow-up', 'blue'],
@@ -15,11 +16,22 @@ const UPDATE_STYLE = {
 
 export default function Updates() {
   const { user } = useAuth();
-  const { state, markUpdateRead, markAllUpdatesRead } = useQueues();
+  const { state, clearUpdates, markUpdateRead, markAllUpdatesRead } = useQueues();
+  const confirm = useConfirm();
   const isAdmin = user.role === 'ADMIN';
   const audience = isAdmin ? 'admin' : user.email;
   const updates = updatesFor(state, audience);
   const unread = new Set(notificationsFor(state, audience).map((update) => update.n));
+
+  async function handleClear() {
+    const ok = await confirm({
+      title: 'Clear notifications?',
+      body: 'This removes the notification history from this view. New updates will still appear as they happen.',
+      confirmLabel: 'Clear notifications',
+      danger: true,
+    });
+    if (ok) clearUpdates(audience);
+  }
 
   return (
     <>
@@ -28,17 +40,24 @@ export default function Updates() {
           <p className="eyebrow">{isAdmin ? 'Administrator' : 'Activity'}</p>
           <h1 id="page-title" tabIndex={-1}>Notifications</h1>
         </div>
-        {unread.size > 0 && (
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => markAllUpdatesRead(audience)}>
-            Mark all as read
-          </button>
-        )}
+        <div className="notification-actions">
+          {unread.size > 0 && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => markAllUpdatesRead(audience)}>
+              Mark all as read
+            </button>
+          )}
+          {updates.length > 0 && (
+            <button type="button" className="btn btn-secondary btn-sm" onClick={handleClear}>
+              Clear notifications
+            </button>
+          )}
+        </div>
       </div>
       <p className="lead">
         {isAdmin ? 'Detailed queue activity across every service, newest first.' : 'Detailed updates about your queue visits, newest first.'}
       </p>
       {!updates.length ? (
-        <EmptyState title="All caught up" body="New queue updates and service notices will appear here." />
+        <EmptyState icon="bell" title="All caught up" body="New queue updates and service notices will appear here." />
       ) : (
         <>
           <p className="day-label">Today · {DEMO_DATE}</p>

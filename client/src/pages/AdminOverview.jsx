@@ -1,3 +1,4 @@
+import { Fragment } from 'react';
 import { Link } from 'react-router-dom';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
 import Icon from '../components/Icon.jsx';
@@ -9,6 +10,7 @@ import { useQueues } from '../QueueContext.jsx';
 import { people } from '../utils/format.js';
 
 const PRIORITY = { low: 'Low priority', medium: 'Medium priority', high: 'High priority' };
+const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
 
 export default function AdminOverview() {
   const { state, toggleOpen } = useQueues();
@@ -17,6 +19,10 @@ export default function AdminOverview() {
 
   const openCount = state.services.filter((s) => s.open).length;
   const waitingTotal = state.services.reduce((sum, s) => sum + queueOf(state, s.id).length, 0);
+  const services = [...state.services].sort((a, b) => {
+    if (a.open !== b.open) return a.open ? -1 : 1;
+    return (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
+  });
 
   async function handleToggle(service) {
     if (service.open) {
@@ -68,7 +74,6 @@ export default function AdminOverview() {
             <tr>
               <th scope="col">Service</th>
               <th scope="col">Status</th>
-              <th scope="col">Next up</th>
               <th scope="col">Waiting</th>
               <th scope="col">Per visit</th>
               <th scope="col">Next joiner waits</th>
@@ -78,58 +83,58 @@ export default function AdminOverview() {
             </tr>
           </thead>
           <tbody>
-            {state.services.map((s) => {
+            {services.map((s, index) => {
               const line = queueOf(state, s.id);
               const waiting = line.length;
               return (
-                <tr key={s.id}>
-                  <th scope="row">
-                    <div className="name-cell">
-                      <ServiceTile service={s} size="sm" />
-                      <div>
-                        <Link to={`/admin/queues/${s.id}`}>{s.name}</Link>
-                        <span className="prio">{PRIORITY[s.priority]}</span>
+                <Fragment key={s.id}>
+                  {!s.open && (index === 0 || services[index - 1].open) && (
+                    <tr className="ops-section-row">
+                      <th colSpan="6">Closed services</th>
+                    </tr>
+                  )}
+                  <tr>
+                    <th scope="row">
+                      <div className="name-cell">
+                        <ServiceTile service={s} size="sm" />
+                        <div>
+                          <Link to={`/admin/queues/${s.id}`}>{s.name}</Link>
+                          <span className={`prio priority-${s.priority}`}>{PRIORITY[s.priority]}</span>
+                        </div>
                       </div>
-                    </div>
-                  </th>
-                  <td data-label="Status">
-                    <div className="status-cell">
-                      <StatusLabel status={s.open ? 'open' : 'closed'} />
-                      <button type="button" className="toggle-link" onClick={() => handleToggle(s)}>
-                        <Icon name={s.open ? 'lock' : 'lock-open'} />
-                        {s.open ? 'Close queue' : 'Open queue'}
-                        <span className="sr-only">: {s.name}</span>
-                      </button>
-                    </div>
-                  </td>
-                  <td data-label="Next up">
-                    {line[0] ? (
-                      <span className="next-up">
-                        <span className="mono">{line[0].id}</span>
-                        <span className="muted">{line[0].name}</span>
-                      </span>
-                    ) : (
-                      <span className="muted">Nobody waiting</span>
-                    )}
-                  </td>
-                  <td data-label="Waiting" className="num">
-                    {waiting}
-                  </td>
-                  <td data-label="Per visit" className="num">
-                    {s.duration} min
-                  </td>
-                  <td data-label="Next joiner waits" className="num">
-                    {waiting * s.duration} min
-                  </td>
-                  <td>
-                    <div className="row-actions">
-                      <Link to={`/admin/queues/${s.id}`} className="btn btn-secondary btn-sm">
-                        Manage queue<span className="sr-only">: {s.name}</span>
-                        <span aria-hidden="true">&nbsp;→</span>
-                      </Link>
-                    </div>
-                  </td>
-                </tr>
+                    </th>
+                    <td data-label="Status">
+                      <div className="status-cell">
+                        <StatusLabel status={s.open ? 'open' : 'closed'} />
+                        <button type="button" className="toggle-link" onClick={() => handleToggle(s)}>
+                          <Icon name={s.open ? 'lock' : 'lock-open'} />
+                          {s.open ? 'Close queue' : 'Open queue'}
+                          <span className="sr-only">: {s.name}</span>
+                        </button>
+                      </div>
+                    </td>
+                    <td data-label="Waiting" className="num">
+                      {waiting}
+                    </td>
+                    <td data-label="Per visit" className="num">
+                      {s.duration} min
+                    </td>
+                    <td data-label="Next joiner waits" className="num">
+                      {waiting * s.duration} min
+                    </td>
+                    <td>
+                      <div className="row-actions">
+                        <Link to={`/admin/services/${s.id}/edit`} className="btn btn-secondary btn-sm">
+                          Edit service<span className="sr-only">: {s.name}</span>
+                        </Link>
+                        <Link to={`/admin/queues/${s.id}`} className="btn btn-secondary btn-sm">
+                          Manage queue<span className="sr-only">: {s.name}</span>
+                          <span aria-hidden="true">&nbsp;→</span>
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                </Fragment>
               );
             })}
           </tbody>

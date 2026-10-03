@@ -21,6 +21,7 @@ const ADMIN_NAV = [
   ['/admin', 'Overview', 'layout-dashboard', 'Overview', true],
   ['/admin/services', 'Services', 'layout-grid', 'Services'],
   ['/admin/queues', 'Waiting lists', 'list-ordered', 'Lists'],
+  ['/admin/history', 'History', 'history', 'History'],
   ['/admin/updates', 'Notifications', 'bell', 'Notifications'],
 ];
 

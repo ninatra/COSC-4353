@@ -1,3 +1,5 @@
+import Icon from './Icon.jsx';
+
 // A small ticket drawing used in empty states.
 export function TicketArt() {
   return (
@@ -15,10 +17,16 @@ export function TicketArt() {
   );
 }
 
-export default function EmptyState({ title, body, action }) {
+export default function EmptyState({ title, body, action, icon }) {
   return (
     <div className="empty">
-      <TicketArt />
+      {icon ? (
+        <span className="empty-icon" aria-hidden="true">
+          <Icon name={icon} />
+        </span>
+      ) : (
+        <TicketArt />
+      )}
       <h2>{title}</h2>
       <p>{body}</p>
       {action}
