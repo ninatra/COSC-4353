@@ -149,8 +149,30 @@ export default function ServiceDetail() {
               <dd className="small">{service.location}</dd>
             </div>
           )}
+          {service.hours && (
+            <div>
+              <dt>Hours</dt>
+              <dd className="small">{service.hours}</dd>
+            </div>
+          )}
+          {service.contact && (
+            <div>
+              <dt>Contact</dt>
+              <dd className="small">{service.contact}</dd>
+            </div>
+          )}
         </dl>
-        <div className="panel join-panel">{panel}</div>
+        <div className="detail-side">
+          <div className="panel join-panel">
+            {panel}
+          </div>
+          {service.instructions && (
+            <div className="service-instructions">
+              <strong>Notes</strong>
+              <p>{service.instructions}</p>
+            </div>
+          )}
+        </div>
       </div>
     </>
   );

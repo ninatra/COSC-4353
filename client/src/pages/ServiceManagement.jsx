@@ -17,7 +17,7 @@ const LOCATION_MAX = 120;
 const HOURS_MAX = 120;
 const CONTACT_MAX = 200;
 const INSTRUCTIONS_MAX = 500;
-const FIELD_ORDER = ['name', 'desc', 'duration', 'location', 'category', 'hours', 'contact', 'maxCapacity'];
+const FIELD_ORDER = ['name', 'desc', 'category','duration', 'location', 'hours', 'contact', 'maxCapacity'];
 const PRIORITIES = [
   ['low', 'Low'],
   ['medium', 'Medium'],
@@ -104,12 +104,12 @@ function ServiceList() {
                   <span className={`priority priority-${service.priority}`}>{service.priority} priority</span>
                 </div>
                 <div className="service-meta">
-                  {service.location && <span><strong>Location:</strong> {service.location}</span>}
-                  {service.contact && <span><strong>Contact:</strong> {service.contact}</span>}
-                  {service.hours && <span><strong>Hours:</strong> {service.hours}</span>}
                   {service.category && <span><strong>Category:</strong> {service.category}</span>}
-                  {service.maxCapacity && <span><strong>Capacity:</strong> {service.maxCapacity}</span>}
+                  {service.location && <span><strong>Location:</strong> {service.location}</span>}
+                  {service.hours && <span><strong>Hours:</strong> {service.hours}</span>}
+                  {service.contact && <span><strong>Contact:</strong> {service.contact}</span>}
                   {service.instructions && <span><strong>Instructions:</strong> {service.instructions}</span>}
+                  {service.maxCapacity && <span><strong>Capacity:</strong> {service.maxCapacity}</span>}
                 </div>
               </div>
               <div className="btn-row">

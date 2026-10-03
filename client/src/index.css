@@ -300,6 +300,7 @@ h1 { font-size: 56px; line-height: 1; letter-spacing: -.035em; }
 .details dd.small { font-family: var(--sans); font-size: 16px; font-weight: 600; }
 .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 24px; }
 .join-panel h2 { font-size: 21px; }
+.detail-side { display: grid; gap: 30px; align-content: start; }
 .join-panel p { color: var(--muted); font-size: 15px; margin: 8px 0 20px; }
 .join-panel .btn { width: 100%; }
 .mini-line { display: flex; gap: 6px; align-items: center; margin: 0 0 20px; flex-wrap: wrap; }
@@ -476,6 +477,10 @@ fieldset.field { border: 0; margin: 0 0 20px; padding: 0; min-width: 0; }
 .check input { width: 20px; height: 20px; accent-color: var(--ticket); }
 .form-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 .service-instructions { padding: 12px 14px; border-left: 3px solid var(--ticket); background: var(--t-blue-bg); color: var(--text) !important; }
+.service-instructions p { margin: 4px 0 0; color: inherit; }
+.priority.priority-low { color: var(--t-mint-ink); font-weight: 700; }
+.priority.priority-medium { color: var(--t-sun-ink); font-weight: 700; }
+.priority.priority-high { color: var(--t-peach-ink); font-weight: 700; }
 
 /* ---------- Auth ---------- */
 
