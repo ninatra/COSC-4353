@@ -12,6 +12,11 @@ import { focusFirstError } from '../utils/validation.js';
 import { people } from '../utils/format.js';
 
 const NAME_MAX = 100;
+const DESCRIPTION_MAX = 500;
+const LOCATION_MAX = 120;
+const HOURS_MAX = 120;
+const CONTACT_MAX = 200;
+const INSTRUCTIONS_MAX = 500;
 const FIELD_ORDER = ['name', 'desc', 'duration', 'location', 'category', 'hours', 'contact', 'maxCapacity'];
 const PRIORITIES = [
   ['low', 'Low'],
@@ -200,13 +205,13 @@ function ServiceForm({ service }) {
             <input type="text" required maxLength={NAME_MAX} value={form.name} onChange={update('name')} {...fieldProps('name', { error: errors.name })} />
           </FormField>
           <FormField id="desc" label="Description" className="form-wide" error={errors.desc}>
-            <textarea required value={form.desc} onChange={update('desc')} {...fieldProps('desc', { error: errors.desc, hint: true })} />
+            <textarea required maxLength={DESCRIPTION_MAX} value={form.desc} onChange={update('desc')} {...fieldProps('desc', { error: errors.desc, hint: true })} />
           </FormField>
           <FormField id="duration" label="Expected duration" suffix="minutes per visit" error={errors.duration}>
             <input type="number" required min="1" step="1" inputMode="numeric" value={form.duration} onChange={update('duration')} {...fieldProps('duration', { error: errors.duration })} />
           </FormField>
           <FormField id="location" label="Location" hint="Building, room number, or virtual service details." error={errors.location}>
-            <input type="text" required value={form.location} onChange={update('location')} {...fieldProps('location', { error: errors.location, hint: true })} />
+            <input type="text" required maxLength={LOCATION_MAX} value={form.location} onChange={update('location')} {...fieldProps('location', { error: errors.location, hint: true })} />
           </FormField>
           <div className={`field ${errors.category ? 'has-error' : ''}`}>
             <label htmlFor="category">Category</label>
@@ -216,16 +221,16 @@ function ServiceForm({ service }) {
             {errors.category && <FieldError id="category-err">{errors.category}</FieldError>}
           </div>
           <FormField id="hours" label="Hours of operation" error={errors.hours}>
-            <input type="text" placeholder="Mon-Fri, 8:00 AM-5:00 PM" value={form.hours} onChange={update('hours')} {...fieldProps('hours', { error: errors.hours })} />
+            <input type="text" maxLength={HOURS_MAX} placeholder="Mon-Fri, 8:00 AM-5:00 PM" value={form.hours} onChange={update('hours')} {...fieldProps('hours', { error: errors.hours })} />
           </FormField>
           <FormField id="contact" label="Contact information" hint="Email address, phone number, or website." error={errors.contact}>
-            <input type="text" value={form.contact} onChange={update('contact')} {...fieldProps('contact', { error: errors.contact, hint: true })} />
+            <input type="text" maxLength={CONTACT_MAX} value={form.contact} onChange={update('contact')} {...fieldProps('contact', { error: errors.contact, hint: true })} />
           </FormField>
           <FormField id="maxCapacity" label="Maximum queue capacity" hint="Leave blank for no limit." error={errors.maxCapacity}>
             <input type="number" min="1" step="1" inputMode="numeric" value={form.maxCapacity} onChange={update('maxCapacity')} {...fieldProps('maxCapacity', { error: errors.maxCapacity, hint: true })} />
           </FormField>
           <FormField id="instructions" label="Additional instructions" className="form-wide" hint="Tell students what to bring or do before joining." error={errors.instructions}>
-            <textarea value={form.instructions} onChange={update('instructions')} {...fieldProps('instructions', { error: errors.instructions, hint: true })} />
+            <textarea maxLength={INSTRUCTIONS_MAX} value={form.instructions} onChange={update('instructions')} {...fieldProps('instructions', { error: errors.instructions, hint: true })} />
           </FormField>
           <fieldset className={`field form-wide ${errors.priority ? 'has-error' : ''}`}>
             <legend>Priority</legend>

@@ -54,7 +54,7 @@ export default function Updates() {
         </div>
       </div>
       <p className="lead">
-        {isAdmin ? 'Detailed queue activity across every service, newest first.' : 'Detailed updates about your queue visits, newest first.'}
+        {isAdmin ? 'Detailed queue activity across every service, newest first.' : 'Queue updates and status changes appear here, newest first.'}
       </p>
       {!updates.length ? (
         <EmptyState icon="bell" title="All caught up" body="New queue updates and service notices will appear here." />

@@ -9,9 +9,13 @@ QueueSmart also gives administrators the tools they need to organize their servi
 - Join available service queues
 - View queue position and estimated wait time
 - Track queue progress and receive status updates
+- Receive in-app notifications for queue updates and status changes
 - Leave a queue when service is no longer needed
-- Create and manage available services
-- Monitor active queues and the users waiting in them
+- Browse service details including location, hours, contact information, category, capacity, and instructions
+- Create, edit, open, close, and delete services as an administrator
+- Monitor active queues and reorder waiting visitors with buttons or drag and drop
+- Record visit problems, outcomes, and notes when serving a visitor
+- Review visit history organized by service
 - Organize and oversee service activity from one place
 
 ## How It Works
@@ -32,7 +36,7 @@ Users can browse available services, join a queue, and track their position and 
 
 ### Administrators
 
-Administrators can create and maintain services, manage active queues, monitor queue activity, and oversee the users waiting for service. The administrative tools are designed to help staff keep queues organized and provide service efficiently.
+Administrators can create and maintain services, manage active queues, monitor queue activity, and oversee the users waiting for service. They can open or close queues, reorder visitors, remove visitors, and complete visits with a problem description, outcome, and optional notes. Visit history is organized by service and can be edited after the visit.
 
 ## Getting Started
 
@@ -54,10 +58,10 @@ npm run dev
 
 Open http://localhost:5173 and log in with a demo account (password `password123`):
 
-| Role          | Email                  |
-| ------------- | ---------------------- |
-| Administrator | admin@queuesmart.dev   |
-| User          | user@queuesmart.dev    |
+| Role          | Email                |
+| ------------- | -------------------- |
+| Administrator | admin@queuesmart.dev |
+| User          | user@queuesmart.dev  |
 
 To register a new administrator, use the admin code set in `ADMIN_SIGNUP_CODE` in `server/.env`.
 Email verification links are printed in the server console instead of being emailed.
@@ -72,6 +76,8 @@ Useful commands:
 - **Stack:** React + Vite with plain CSS (design tokens in `client/src/index.css`, light and dark themes) and lucide-react icons. React gives us reusable components for the ticket, service cards and dialogs; Vite keeps development fast; plain CSS with custom properties keeps the design system in one place without a UI kit.
 - **Mock data and simulation:** queue data is sample data kept in the browser (localStorage), not the server. A simulated clock starts at 10:05 AM and moves forward a few minutes with each action. Joining, leaving, serving, reordering and removing all update every screen and write to Updates.
 - **Wait estimate:** people ahead × the service's expected visit length. This is a deliberate simplification for the demo.
+- **In-app notifications:** the bell and Notifications page display queue updates and status changes. Notifications are intentionally in-app only for this assignment; service configuration changes and queue reordering are not treated as alerts.
+- **Visit completion:** administrators record a required problem, an outcome (Completed, Referred elsewhere, Unresolved, or Follow-up needed), and optional notes before a visitor is removed from the active queue.
 - **Sign in** uses the real API and database; everything after sign-in uses the mock data. Use **Reset demo** in the footer to restore the sample data.
 
 ## Project Structure

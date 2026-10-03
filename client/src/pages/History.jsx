@@ -167,7 +167,7 @@ function AdminHistory({ rows, state }) {
             <h2>Edit visit history</h2>
             <p>{editing.visitorName ?? editing.email ?? 'Walk-in'} · <span className="mono">{editing.ticketId}</span></p>
             <label htmlFor="history-problem">Problem</label>
-            <textarea id="history-problem" required value={draft.problem} onChange={(event) => setDraft({ ...draft, problem: event.target.value })} placeholder="What did the student need help with?" />
+            <textarea id="history-problem" required maxLength={500} value={draft.problem} onChange={(event) => setDraft({ ...draft, problem: event.target.value })} placeholder="What did the student need help with?" />
             <label htmlFor="history-outcome">Outcome</label>
             <select id="history-outcome" value={draft.outcome} onChange={(event) => setDraft({ ...draft, outcome: event.target.value })}>
               <option value="completed">Completed</option>
@@ -176,7 +176,7 @@ function AdminHistory({ rows, state }) {
               <option value="follow-up">Follow-up needed</option>
             </select>
             <label htmlFor="history-notes">Notes</label>
-            <textarea id="history-notes" value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} />
+            <textarea id="history-notes" maxLength={500} value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} />
             <div className="dlg-actions">
               <button type="button" className="btn btn-secondary" onClick={closeEdit}>Cancel</button>
               <button type="submit" className="btn btn-primary">Save changes</button>

@@ -154,6 +154,7 @@ export default function WaitingLists() {
             <textarea
               id="visit-problem"
               required
+              maxLength={500}
               value={completion.problem}
               onChange={(event) => setCompletion({ ...completion, problem: event.target.value })}
               placeholder="What did the student need help with?"
@@ -172,6 +173,7 @@ export default function WaitingLists() {
             <label htmlFor="visit-notes">Notes <span className="muted">(optional)</span></label>
             <textarea
               id="visit-notes"
+              maxLength={500}
               value={completion.notes}
               onChange={(event) => setCompletion({ ...completion, notes: event.target.value })}
               placeholder="Add a brief outcome or follow-up note"
