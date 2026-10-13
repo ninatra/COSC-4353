@@ -99,7 +99,7 @@ export default function QueueTicket({ variant }) {
 
 function ActiveTicket({ ticket, service, status, position, lineLength, ahead, bump, foot }) {
   const shownPosition = useCountUp(position);
-  const shownWait = useCountUp(ahead * service.duration);
+  const shownWait = useCountUp(ahead * service.expectedDuration);
   const note =
     ahead === 0
       ? "You're next · Head to the desk now"

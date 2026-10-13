@@ -41,6 +41,41 @@ async function main() {
     });
   }
 
+  if (!(await prisma.service.findFirst({ where: { name: 'Student Services' } }))) {
+    await prisma.service.create({
+      data: {
+        name: 'Student Services',
+        description: 'ID cards, enrollment verification, and records requests.',
+        expectedDuration: 10,
+        priority: 'LOW',
+        category: 'Student support',
+        location: 'Allen Center, Room 104',
+        contact: 'studentservices@university.edu',
+        hours: 'Mon-Fri, 8:30 AM-4:30 PM',
+        instructions: 'Bring a photo ID and any forms needed for your request.',
+      },
+    });
+  }
+
+  // Fill missing metadata on the original demo services without replacing edited text.
+  const details = {
+    'Academic Advising': { category: 'Academic', location: 'Lovett Hall, Suite 210', contact: 'advising@university.edu', hours: 'Mon-Thu, 9:00 AM-4:00 PM', instructions: 'Have your degree plan and questions ready before visiting.' },
+    'Financial Aid': { category: 'Financial', location: 'Allen Center, Financial Aid Office', contact: 'financialaid@university.edu', hours: 'Mon-Fri, 9:00 AM-4:00 PM', instructions: 'Bring your university ID and relevant financial aid documents.' },
+    'IT Help Desk': { category: 'Technology', location: 'Fondren Library, Room 112', contact: 'it@university.edu', hours: 'Mon-Fri, 8:00 AM-5:00 PM', instructions: 'Bring your device and university ID if you need account or hardware help.' },
+  };
+  for (const service of await prisma.service.findMany()) {
+    const defaults = details[service.name];
+    if (!defaults) continue;
+    const data = {};
+    for (const field of ['location', 'contact', 'hours', 'instructions']) {
+      if (!service[field]) data[field] = defaults[field];
+    }
+    if (service.category === 'Other' && !service.location && !service.contact && !service.hours) {
+      data.category = defaults.category;
+    }
+    if (Object.keys(data).length) await prisma.service.update({ where: { id: service.id }, data });
+  }
+
   console.log('Seeded demo data. Log in with admin@queuesmart.dev or user@queuesmart.dev / password123');
 }
 

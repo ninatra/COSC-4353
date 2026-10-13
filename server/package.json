@@ -5,6 +5,8 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
+    "test": "node --test",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include='src/**/*.js'",
     "dev": "node --watch --env-file=.env src/index.js",
     "start": "node --env-file=.env src/index.js",
     "db:setup": "prisma db push && prisma db seed",

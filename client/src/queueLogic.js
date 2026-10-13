@@ -3,7 +3,7 @@
 // Estimated wait = people ahead × the service's expected visit length. This is
 // deliberately simpler than a production rule set.
 import { DEMO_DATE, TINTS } from './mockData.js';
-import { pad, people } from './utils/format.js';
+import { pad } from './utils/format.js';
 
 // A ticket is "almost ready" at this position or closer.
 export const ALMOST_READY_POSITION = 2;
@@ -12,7 +12,7 @@ export const ALMOST_READY_POSITION = 2;
 
 export const findService = (state, id) => state.services.find((s) => s.id === id);
 export const queueOf = (state, id) => state.queues[id] ?? [];
-export const waitFor = (state, serviceId) => queueOf(state, serviceId).length * (findService(state, serviceId)?.duration ?? 0);
+export const waitFor = (state, serviceId) => queueOf(state, serviceId).length * (findService(state, serviceId)?.expectedDuration ?? 0);
 
 export const ticketOf = (state, email) => state.tickets[email] ?? null;
 export const isWaiting = (state, email) => ticketOf(state, email)?.status === 'waiting';
@@ -46,13 +46,17 @@ export function crowdLevel(waitMinutes) {
 export function updatesFor(state, audience) {
   const clearedUpTo = state.cleared[audience] ?? 0;
   return state.updates
-    .filter((u) => u.audience === audience && u.n > clearedUpTo)
+    .filter((u) => u.audience === audience && u.n > clearedUpTo &&
+      (audience !== 'admin' || !['opened', 'closed'].includes(u.kind)))
     .sort((a, b) => b.t - a.t || b.n - a.n);
 }
 
 export function notificationsFor(state, audience) {
   const read = state.read?.[audience] ?? [];
-  return updatesFor(state, audience).filter((u) => u.notify !== false && !read.includes(u.n));
+  return updatesFor(state, audience).filter((u) =>
+    u.notify !== false && !read.includes(u.n) &&
+    (audience !== 'admin' || ['queue-active', 'capacity'].includes(u.kind))
+  );
 }
 
 export const historyFor = (state, email) => state.history.filter((h) => h.email === email);
@@ -69,7 +73,7 @@ function advance(draft, minutes = 2) {
 }
 
 function addUpdate(draft, update) {
-  draft.updates.push({ n: ++draft.n, t: draft.clock, ...update });
+  draft.updates.push({ n: ++draft.n, t: draft.clock, notify: update.audience !== 'admin', ...update });
 }
 
 function almostUpdate(draft, email, pos) {
@@ -106,7 +110,7 @@ function tracked(draft, serviceId, change, reason) {
       audience: email,
       kind: 'position',
       title: 'Position changed',
-      body: `${reason ? `${reason} ` : ''}Your current position in line is ${pad(after)}. Your estimated wait is about ${(after - 1) * service.duration} minutes.${positionNote}`,
+      body: `${reason ? `${reason} ` : ''}Your current position in line is ${pad(after)}. Your estimated wait is about ${(after - 1) * service.expectedDuration} minutes.${positionNote}`,
       serviceId,
       ticketId: draft.tickets[email].id,
     });
@@ -148,7 +152,7 @@ export const actions = {
   // user = { name, email }
   join(draft, serviceId, user) {
     const service = findService(draft, serviceId);
-    if (!service?.open) return `${service?.name ?? 'This service'} is closed to new visitors.`;
+    if (!service?.isOpen) return `${service?.name ?? 'This service'} is closed to new visitors.`;
     if (service.maxCapacity && queueOf(draft, serviceId).length >= service.maxCapacity) return `${service.name} is currently at capacity.`;
     if (isWaiting(draft, user.email)) return 'You can hold one place at a time.';
 
@@ -165,7 +169,7 @@ export const actions = {
       audience: user.email,
       kind: 'confirmed',
       title: 'Ticket confirmed',
-      body: `Your ticket ${id} is confirmed for {svc}. You have joined the queue and you're #${pos} in line. The estimated wait is about ${(pos - 1) * service.duration} minutes. Please find a seat in the waiting area and we will see you soon.`,
+      body: `Your ticket ${id} is confirmed for {svc}. You have joined the queue and you're #${pos} in line. The estimated wait is about ${(pos - 1) * service.expectedDuration} minutes. Please find a seat in the waiting area and we will see you soon.`,
       serviceId,
       ticketId: id,
     });
@@ -173,12 +177,20 @@ export const actions = {
       audience: user.email,
       kind: 'joined',
       title: 'Queue joined',
-      body: `You are currently #${pos} in the {svc} queue, with an estimated wait of about ${(pos - 1) * service.duration} minutes. We will update you as your position changes.`,
+      body: `You are currently #${pos} in the {svc} queue, with an estimated wait of about ${(pos - 1) * service.expectedDuration} minutes. We will update you as your position changes.`,
       serviceId,
       ticketId: id,
     });
     if (pos <= ALMOST_READY_POSITION) almostUpdate(draft, user.email, pos);
     addUpdate(draft, { audience: 'admin', kind: 'joined', title: 'Visitor joined', body: `${id} joined {svc}. ${pos} waiting.`, serviceId });
+    if (pos === 1) {
+      addUpdate(draft, { audience: 'admin', kind: 'queue-active', title: 'First visitor waiting',
+        body: `${id} joined the empty {svc} queue. A visitor is ready for service.`, serviceId, notify: true });
+    }
+    if (service.maxCapacity && pos === service.maxCapacity) {
+      addUpdate(draft, { audience: 'admin', kind: 'capacity', title: 'Queue at capacity',
+        body: `{svc} has reached its capacity of ${service.maxCapacity} visitors. New visitors cannot join until a place opens.`, serviceId, notify: true });
+    }
     return `You're in line for ${service.name} · ${id}`;
   },
 
@@ -267,23 +279,15 @@ export const actions = {
   toggleOpen(draft, serviceId) {
     const service = findService(draft, serviceId);
     advance(draft, 1);
-    service.open = !service.open;
-    const waiting = queueOf(draft, serviceId).length;
-    addUpdate(draft, {
-      audience: 'admin',
-      kind: service.open ? 'opened' : 'closed',
-      title: service.open ? 'Queue opened' : 'Queue closed',
-      body: service.open ? '{svc} is accepting new visitors.' : `{svc} closed to new visitors. ${people(waiting)} kept their place.`,
-      serviceId,
-    });
-    if (!service.open) {
+    service.isOpen = !service.isOpen;
+    if (!service.isOpen) {
       for (const [email, ticket] of Object.entries(draft.tickets)) {
         if (ticket.status === 'waiting' && ticket.serviceId === serviceId) {
           addUpdate(draft, { audience: email, kind: 'closed', title: 'Service closed to new visitors', body: `{svc} is no longer accepting new visitors, but your place is kept. You are still in line and will be notified when your position changes.`, serviceId, ticketId: ticket.id });
         }
       }
     }
-    return `${service.name} ${service.open ? 'is open' : 'is closed to new visitors'}`;
+    return `${service.name} ${service.isOpen ? 'is open' : 'is closed to new visitors'}`;
   },
 
   // For the Service Management screen.
@@ -295,19 +299,19 @@ export const actions = {
       const service = findService(draft, serviceId);
       const changes = [];
       if (service.name !== values.name) changes.push(`renamed from “${service.name}”`);
-      if (service.duration !== values.duration) changes.push(`expected duration ${service.duration} → ${values.duration} min`);
-      if (service.desc !== values.desc) changes.push('description edited');
+      if (service.expectedDuration !== values.expectedDuration) changes.push(`expected duration ${service.expectedDuration} → ${values.expectedDuration} min`);
+      if (service.description !== values.description) changes.push('description edited');
       if (service.priority !== values.priority) changes.push(`priority set to ${values.priority}`);
       if (service.location !== values.location) changes.push('location edited');
       if (service.contact !== values.contact) changes.push('contact information edited');
       if (service.hours !== values.hours) changes.push('hours edited');
       if (service.category !== values.category) changes.push('category changed');
       if (service.maxCapacity !== values.maxCapacity) changes.push('capacity changed');
-      const durationChanged = service.duration !== values.duration;
+      const durationChanged = service.expectedDuration !== values.expectedDuration;
       Object.assign(service, {
         name: values.name,
-        desc: values.desc,
-        duration: values.duration,
+        description: values.description,
+        expectedDuration: values.expectedDuration,
         priority: values.priority,
         location: values.location,
         contact: values.contact,
@@ -323,7 +327,7 @@ export const actions = {
         for (const [email, ticket] of Object.entries(draft.tickets)) {
           if (ticket.status !== 'waiting' || ticket.serviceId !== serviceId) continue;
           const ahead = positionOf(draft, email) - 1;
-          addUpdate(draft, { audience: email, kind: 'wait', title: 'Wait estimate updated', body: `Your estimated wait for {svc} is now about ${ahead * values.duration} minutes because each visit is expected to take ${values.duration} minutes. Your position in line is unchanged.`, serviceId, ticketId: ticket.id });
+          addUpdate(draft, { audience: email, kind: 'wait', title: 'Wait estimate updated', body: `Your estimated wait for {svc} is now about ${ahead * values.expectedDuration} minutes because each visit is expected to take ${values.expectedDuration} minutes. Your position in line is unchanged.`, serviceId, ticketId: ticket.id });
         }
       }
       return `Saved ${values.name}`;
@@ -332,10 +336,10 @@ export const actions = {
     draft.services.push({
       id,
       name: values.name,
-      desc: values.desc,
-      duration: values.duration,
+      description: values.description,
+      expectedDuration: values.expectedDuration,
       priority: values.priority,
-      open: values.open,
+      isOpen: values.isOpen,
       location: values.location,
       contact: values.contact,
       hours: values.hours,
@@ -348,7 +352,7 @@ export const actions = {
     });
     draft.queues[id] = [];
     draft.counters[id] = 1;
-    addUpdate(draft, { audience: 'admin', kind: 'created', title: 'Service created', body: `{svc} was created${values.open ? ' and is open.' : ' and is closed.'}`, serviceId: id, notify: false });
+    addUpdate(draft, { audience: 'admin', kind: 'created', title: 'Service created', body: `{svc} was created${values.isOpen ? ' and is open.' : ' and is closed.'}`, serviceId: id, notify: false });
     return `Created ${values.name}`;
   },
 

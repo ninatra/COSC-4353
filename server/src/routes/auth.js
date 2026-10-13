@@ -17,8 +17,15 @@ function publicUser(user) {
 router.post('/register', async (req, res) => {
   const { name, email, password, role = 'USER', adminCode } = req.body ?? {};
 
-  if (!name?.trim() || !email?.trim() || !password) {
-    return res.status(400).json({ error: 'Name, email and password are required' });
+  if (
+    typeof name !== 'string' ||
+    typeof email !== 'string' ||
+    typeof password !== 'string' ||
+    !name.trim() ||
+    !email.trim() ||
+    !password.trim()
+  ) {
+    return res.status(400).json({ error: 'Name, email and password are required and must be text' });
   }
   if (!EMAIL_RE.test(email)) {
     return res.status(400).json({ error: 'Email address is not valid' });
@@ -59,8 +66,13 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body ?? {};
-  if (!email || !password) {
-    return res.status(400).json({ error: 'Email and password are required' });
+  if (
+    typeof email !== 'string' ||
+    typeof password !== 'string' ||
+    !email.trim() ||
+    !password.trim()
+  ) {
+    return res.status(400).json({ error: 'Email and password are required and must be text' });
   }
 
   const user = await prisma.user.findUnique({

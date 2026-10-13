@@ -20,8 +20,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #141716; --panel: #1C201F; --panel-2: #242927; --text: #EDEEE8; --muted: #A3AAA6;
-    --border: #2E3431; --border-strong: #3F4642;
+    --bg: #141716; --panel: #282E2B; --panel-2: #333B36; --text: #EDEEE8; --muted: #A3AAA6;
+    --border: #465149; --border-strong: #647268;
     --ticket: #6E96F2; --ticket-hover: #84A8F6; --link: #A9C2FF; --lime: #DFFF83;
     --ok: #5CC08B; --warn: #E3A541; --bad: #F2837A; --bad-soft: #5A2C28;
     --inverse-bg: #EDEEE8; --inverse-ink: #141716; --backdrop: rgba(0, 0, 0, .6); --ring: rgba(169, 194, 255, .28);
@@ -35,8 +35,8 @@
 }
 
 :root[data-theme='dark'] {
-  --bg: #141716; --panel: #1C201F; --panel-2: #242927; --text: #EDEEE8; --muted: #A3AAA6;
-  --border: #2E3431; --border-strong: #3F4642;
+  --bg: #141716; --panel: #282E2B; --panel-2: #333B36; --text: #EDEEE8; --muted: #A3AAA6;
+  --border: #465149; --border-strong: #647268;
   --ticket: #6E96F2; --ticket-hover: #84A8F6; --link: #A9C2FF; --lime: #DFFF83;
   --ok: #5CC08B; --warn: #E3A541; --bad: #F2837A; --bad-soft: #5A2C28;
   --inverse-bg: #EDEEE8; --inverse-ink: #141716; --backdrop: rgba(0, 0, 0, .6); --ring: rgba(169, 194, 255, .28);
@@ -373,18 +373,32 @@ td.num { font-variant-numeric: tabular-nums; font-weight: 600; }
 .ops-summary dd span { font-size: 17px; color: var(--muted); font-weight: 500; letter-spacing: 0; }
 .ops-note { font-size: 14px; color: var(--muted); margin-top: 14px; display: flex; gap: 8px; align-items: flex-start; }
 .ops-note .lucide { width: 16px; height: 16px; flex: none; margin-top: 2px; }
-.svc-list { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
-.svc-list li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: 28px; row-gap: 16px; align-items: center; padding: 18px 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--panel); }
-.svc-list li > .tile { align-self: start; }
-.svc-list h2 { font-size: 19px; }
-.svc-list .meta { font-size: 14px; color: var(--muted); margin-top: 6px; display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
-.service-summary { width: 100%; padding: 8px 10px; border-left: 4px solid var(--ticket); background: var(--t-blue-bg); font-weight: 600; }
-.service-summary .priority { font-weight: 700; }
-.service-summary .priority-low { color: var(--t-mint-ink); }
-.service-summary .priority-medium { color: var(--t-sun-ink); }
-.service-summary .priority-high { color: var(--t-peach-ink); }
-.service-meta { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 18px; margin-top: 10px; color: var(--muted); font-size: 13px; line-height: 1.4; }
-.service-meta strong { color: var(--text); font-weight: 600; }
+.svc-list { list-style: none; padding: 0; margin: 24px 0 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.svc-list .admin-service-card { display: flex; flex-direction: column; min-width: 0; padding: 24px; border: 1px solid var(--border); border-radius: 16px; background: var(--panel); }
+.admin-service-heading { display: flex; align-items: center; gap: 12px; }
+.admin-service-title { min-width: 0; flex: 1; }
+.admin-service-title h2 { font-size: 19px; overflow-wrap: anywhere; }
+.admin-service-category { color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; margin-bottom: 3px; }
+.admin-service-heading .status { flex-shrink: 0; }
+.admin-service-description { color: var(--text); font-size: 16px; line-height: 1.6; margin-top: 18px; overflow-wrap: anywhere; }
+.admin-service-location { display: flex; align-items: flex-start; gap: 7px; color: var(--link); font-size: 14px; font-weight: 600; margin-top: 4px; margin-bottom: 20px; overflow-wrap: anywhere; }
+.admin-service-location .lucide { width: 15px; height: 15px; margin-top: 2px; flex: none; }
+.admin-service-details { display: grid; gap: 10px; margin: 0 0 20px; font-size: 13px; }
+.admin-service-details > div { display: grid; grid-template-columns: 80px minmax(0, 1fr); gap: 12px; }
+.admin-service-details dt { color: var(--muted); }
+.admin-service-details dd { margin: 0; overflow-wrap: anywhere; }
+.admin-service-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 16px 0; margin: 20px 0 0; border-top: 1px solid var(--border); }
+.admin-service-metrics dt { color: var(--muted); font-size: 12px; margin-bottom: 5px; }
+.admin-service-metrics dd { margin: 0; font-family: var(--display); font-size: 20px; font-weight: 600; }
+.admin-service-metrics dd span { color: var(--muted); font: 13px var(--sans); }
+.admin-service-metrics dd.priority { font-size: 16px; padding-top: 3px; }
+.admin-service-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: auto; padding-top: 16px; border-top: 1px solid var(--border); }
+.admin-service-actions .btn { padding-inline: 12px; }
+.admin-service-delete { margin-left: auto; color: var(--bad); }
+.admin-service-delete:hover { border-color: var(--bad); background: var(--panel-2); }
+@media (max-width: 900px) { .svc-list { grid-template-columns: 1fr; } }
+@media (max-width: 480px) { .svc-list .admin-service-card { padding: 18px; } .admin-service-heading { flex-wrap: wrap; } }
+
 .qtabs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
 .qtab { display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px 0 6px; border: 1px solid var(--border); background: var(--panel); border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 14px; }
 .qtab .tile { width: 32px; height: 32px; border-radius: 8px; }
@@ -600,9 +614,6 @@ dialog::backdrop { background: var(--backdrop); }
   .uitem time { grid-column: 2; padding-top: 0; }
   .dlg-actions { flex-direction: column-reverse; }
   .dlg-actions .btn { width: 100%; }
-  .svc-list li { grid-template-columns: auto minmax(0, 1fr); }
-  .svc-list .btn-row { grid-column: 1 / -1; }
-  .service-meta { grid-template-columns: 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .form-wide { grid-column: auto; }
   .detail-head .tile-lg { width: 52px; height: 52px; }

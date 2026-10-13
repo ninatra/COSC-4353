@@ -23,11 +23,11 @@ export default function ServiceCard({ service }) {
           <StatusLabel status="open" />
         </div>
         <h3>{service.name}</h3>
-        <p className="desc">{service.desc}</p>
+        <p className="desc">{service.description}</p>
         <dl className="stats">
           <div>
             <dt>Est. wait</dt>
-            <dd>{waiting * service.duration} min</dd>
+            <dd>{waiting * service.expectedDuration} min</dd>
           </div>
           <div>
             <dt>Waiting</dt>
@@ -36,7 +36,7 @@ export default function ServiceCard({ service }) {
           <div className="crowd-cell">
             <dt className="sr-only">How busy</dt>
             <dd>
-              <CrowdMeter wait={waiting * service.duration} />
+              <CrowdMeter wait={waiting * service.expectedDuration} />
             </dd>
           </div>
         </dl>
@@ -63,7 +63,7 @@ export function ClosedServiceRow({ service }) {
       <ServiceTile service={service} size="sm" />
       <div>
         <span className="closed-name">{service.name}</span>
-        <span className="closed-desc">{service.desc}</span>
+        <span className="closed-desc">{service.description}</span>
       </div>
       <StatusLabel status="closed" />
       <Link to={`/services/${service.id}`} className="link-arrow">
@@ -77,8 +77,8 @@ export function ClosedServiceRow({ service }) {
 // Open services as cards, closed ones as compact rows.
 export function ServiceList() {
   const { state } = useQueues();
-  const open = state.services.filter((s) => s.open);
-  const closed = state.services.filter((s) => !s.open);
+  const open = state.services.filter((s) => s.isOpen);
+  const closed = state.services.filter((s) => !s.isOpen);
   return (
     <>
       {open.length ? (

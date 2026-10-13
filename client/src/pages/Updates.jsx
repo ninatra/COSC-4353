@@ -8,6 +8,7 @@ import { fmtTime } from '../utils/format.js';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
 
 const UPDATE_STYLE = {
+  'queue-active': ['user-plus', 'blue'], capacity: ['users', 'sun'],
   confirmed: ['ticket', 'blue'], joined: ['user-plus', 'blue'], position: ['arrow-up', 'blue'],
   almost: ['bell-ring', 'sun'], served: ['circle-check', 'mint'], left: ['log-out', 'peach'],
   removed: ['user-minus', 'peach'], closed: ['lock', 'peach'], opened: ['lock-open', 'mint'],

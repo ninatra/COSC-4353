@@ -14,7 +14,7 @@ export default function Overview() {
   const { ticket, status } = useMyTicket();
   useCelebration();
 
-  const openCount = state.services.filter((s) => s.open).length;
+  const openCount = state.services.filter((s) => s.isOpen).length;
   const lead = !ticket
     ? "You're not in a line right now. Pick a service below to save your place."
     : status === 'served'

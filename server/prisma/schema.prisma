@@ -32,6 +32,12 @@ model Service {
   expectedDuration Int // minutes per person
   priority         String   @default("MEDIUM") // LOW | MEDIUM | HIGH
   isOpen           Boolean  @default(true)
+  location         String   @default("")
+  contact          String   @default("")
+  hours            String   @default("")
+  category         String   @default("Other")
+  maxCapacity      Int? // null means no queue capacity limit
+  instructions     String   @default("")
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

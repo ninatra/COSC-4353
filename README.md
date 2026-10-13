@@ -78,7 +78,7 @@ Useful commands:
 - **Wait estimate:** people ahead × the service's expected visit length. This is a deliberate simplification for the demo.
 - **In-app notifications:** the bell and Notifications page display queue updates and status changes. Notifications are intentionally in-app only for this assignment; service configuration changes and queue reordering are not treated as alerts.
 - **Visit completion:** administrators record a required problem, an outcome (Completed, Referred elsewhere, Unresolved, or Follow-up needed), and optional notes before a visitor is removed from the active queue.
-- **Sign in** uses the real API and database; everything after sign-in uses the mock data. Use **Reset demo** in the footer to restore the sample data.
+- **Sign in and service management** use the real API and database. Queue operations still use mock data. **Reset demo** resets the local queue simulation and keeps server services.
 
 ## Project Structure
 

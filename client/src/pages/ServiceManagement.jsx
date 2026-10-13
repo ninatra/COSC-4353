@@ -17,11 +17,11 @@ const LOCATION_MAX = 120;
 const HOURS_MAX = 120;
 const CONTACT_MAX = 200;
 const INSTRUCTIONS_MAX = 500;
-const FIELD_ORDER = ['name', 'desc', 'category','duration', 'location', 'hours', 'contact', 'maxCapacity'];
+const FIELD_ORDER = ['name', 'description', 'category','expectedDuration', 'location', 'hours', 'contact', 'maxCapacity'];
 const PRIORITIES = [
-  ['low', 'Low'],
-  ['medium', 'Medium'],
-  ['high', 'High'],
+  ['LOW', 'Low'],
+  ['MEDIUM', 'Medium'],
+  ['HIGH', 'High'],
 ];
 const CATEGORIES = ['Academic', 'Financial', 'Technology', 'Student support', 'Other'];
 
@@ -49,7 +49,7 @@ function ServiceList() {
   const toast = useToast();
 
   async function handleToggle(service) {
-    if (service.open) {
+    if (service.isOpen) {
       const waiting = queueOf(state, service.id).length;
       const ok = await confirm({
         title: `Close ${service.name}?`,
@@ -60,7 +60,7 @@ function ServiceList() {
       });
       if (!ok) return;
     }
-    toast(toggleOpen(service.id));
+    try { toast(await toggleOpen(service.id)); } catch (error) { toast(error.message); }
   }
 
   async function handleDelete(service) {
@@ -72,7 +72,7 @@ function ServiceList() {
       danger: !waiting,
     });
     if (!ok || waiting) return;
-    toast(deleteService(service.id));
+    try { toast(await deleteService(service.id)); } catch (error) { toast(error.message); }
   }
 
   return (
@@ -92,41 +92,39 @@ function ServiceList() {
         {state.services.map((service) => {
           const waiting = queueOf(state, service.id).length;
           return (
-            <li key={service.id}>
-              <ServiceTile service={service} />
-              <div>
-                <h2>{service.name}</h2>
-                <p className="desc">{service.desc}</p>
-                <div className="meta service-summary">
-                  <StatusLabel status={service.open ? 'open' : 'closed'} />
-                  <span>{service.duration} min per visit</span>
-                  <span>{waiting} {waiting === 1 ? 'person' : 'people'} waiting</span>
-                  <span className={`priority priority-${service.priority}`}>{service.priority} priority</span>
+            <li key={service.id} className="admin-service-card">
+              <div className="admin-service-heading">
+                <ServiceTile service={service} />
+                <div className="admin-service-title">
+                  <p className="admin-service-category">{service.category || 'Other'}</p>
+                  <h2>{service.name}</h2>
                 </div>
-                <div className="service-meta">
-                  {service.category && <span><strong>Category:</strong> {service.category}</span>}
-                  {service.location && <span><strong>Location:</strong> {service.location}</span>}
-                  {service.hours && <span><strong>Hours:</strong> {service.hours}</span>}
-                  {service.contact && <span><strong>Contact:</strong> {service.contact}</span>}
-                  {service.instructions && <span><strong>Instructions:</strong> {service.instructions}</span>}
-                  {service.maxCapacity && <span><strong>Capacity:</strong> {service.maxCapacity}</span>}
-                </div>
+                <StatusLabel status={service.isOpen ? 'open' : 'closed'} />
               </div>
-              <div className="btn-row">
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleToggle(service)}>
-                  <Icon name={service.open ? 'lock' : 'lock-open'} />
-                  {service.open ? 'Close' : 'Open'}
+              <p className="admin-service-description">{service.description}</p>
+              <dl className="admin-service-metrics">
+                <div><dt>Waiting</dt><dd>{waiting}{service.maxCapacity ? <span> / {service.maxCapacity}</span> : null}</dd></div>
+                <div><dt>Visit duration</dt><dd>{service.expectedDuration}<span> min</span></dd></div>
+                <div><dt>Priority</dt><dd className={`priority priority-${service.priority.toLowerCase()}`}>{service.priority.charAt(0).toUpperCase() + service.priority.slice(1).toLowerCase()}</dd></div>
+              </dl>
+              <div className="admin-service-location">
+                <Icon name="map-pin" />
+                <span>{service.location || 'Location not set'}</span>
+              </div>
+              {(service.hours || service.contact || service.instructions) && (
+                <dl className="admin-service-details">
+                  {service.hours && <div><dt>Hours</dt><dd>{service.hours}</dd></div>}
+                  {service.contact && <div><dt>Contact</dt><dd>{service.contact}</dd></div>}
+                  {service.instructions && <div><dt>Instructions</dt><dd>{service.instructions}</dd></div>}
+                </dl>
+              )}
+              <div className="admin-service-actions">
+                <Link to={`/admin/queues/${service.id}`} className="btn btn-secondary btn-sm">Waiting list</Link>
+                <Link to={`/admin/services/${service.id}/edit`} className="btn btn-secondary btn-sm" aria-label={`Edit ${service.name}`}><Icon name="pencil" />Edit</Link>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleToggle(service)} aria-label={`${service.isOpen ? 'Close' : 'Open'} ${service.name}`}>
+                  <Icon name={service.isOpen ? 'lock' : 'lock-open'} />{service.isOpen ? 'Close' : 'Open'}
                 </button>
-                <Link to={`/admin/services/${service.id}/edit`} className="btn btn-secondary btn-sm">
-                  <Icon name="pencil" />
-                  Edit
-                </Link>
-                <Link to={`/admin/queues/${service.id}`} className="btn btn-secondary btn-sm">
-                  Waiting list
-                </Link>
-                <button type="button" className="btn btn-danger-outline btn-sm" onClick={() => handleDelete(service)}>
-                  Delete
-                </button>
+                <button type="button" className="icon-btn admin-service-delete" onClick={() => handleDelete(service)} aria-label={`Delete ${service.name}`} title="Delete service"><Icon name="trash-2" /></button>
               </div>
             </li>
           );
@@ -143,15 +141,16 @@ function ServiceForm({ service }) {
   const toast = useToast();
   const [form, setForm] = useState(() => service
     ? {
-        name: service.name, desc: service.desc, duration: String(service.duration), priority: service.priority, open: service.open,
+        name: service.name, description: service.description, expectedDuration: String(service.expectedDuration), priority: service.priority, isOpen: service.isOpen,
         location: service.location ?? '', contact: service.contact ?? '', hours: service.hours ?? '', category: service.category ?? 'Other',
         maxCapacity: service.maxCapacity ? String(service.maxCapacity) : '', instructions: service.instructions ?? '',
       }
     : {
-        name: '', desc: '', duration: '', priority: 'low', open: true, location: '', contact: '', hours: '', category: 'Other',
+        name: '', description: '', expectedDuration: '', priority: 'LOW', isOpen: true, location: '', contact: '', hours: '', category: 'Other',
         maxCapacity: '', instructions: '',
       });
   const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
 
   const update = (field) => (event) => {
     const value = event.target.type === 'checkbox' ? event.target.checked : event.target.value;
@@ -159,16 +158,16 @@ function ServiceForm({ service }) {
     if (errors[field]) setErrors({ ...errors, [field]: undefined });
   };
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const found = {};
     if (!form.name.trim()) found.name = 'Enter a service name.';
     else if (form.name.trim().length > NAME_MAX) found.name = `Keep the service name to ${NAME_MAX} characters or fewer.`;
-    if (!form.desc.trim()) found.desc = 'Enter a short description.';
+    if (!form.description.trim()) found.description = 'Enter a short description.';
     if (!form.location.trim()) found.location = 'Enter the service location.';
-    const duration = Number(form.duration);
-    if (!form.duration.trim()) found.duration = 'Enter the expected visit duration.';
-    else if (!Number.isInteger(duration) || duration < 1) found.duration = 'Use a whole number of minutes greater than zero.';
+    const expectedDuration = Number(form.expectedDuration);
+    if (!form.expectedDuration.trim()) found.expectedDuration = 'Enter the expected visit duration.';
+    else if (!Number.isInteger(expectedDuration) || expectedDuration < 1) found.expectedDuration = 'Use a whole number of minutes greater than zero.';
     if (!PRIORITIES.some(([value]) => value === form.priority)) found.priority = 'Choose a priority.';
     if (!form.category.trim()) found.category = 'Choose a service category.';
     const maxCapacity = form.maxCapacity.trim() ? Number(form.maxCapacity) : null;
@@ -179,12 +178,16 @@ function ServiceForm({ service }) {
       return;
     }
     const values = {
-      name: form.name.trim(), desc: form.desc.trim(), duration, priority: form.priority, open: form.open,
+      name: form.name.trim(), description: form.description.trim(), expectedDuration, priority: form.priority, isOpen: form.isOpen,
       location: form.location.trim(), contact: form.contact.trim(), hours: form.hours.trim(), category: form.category,
       maxCapacity, instructions: form.instructions.trim(),
     };
-    toast(isEditing ? saveService(values, service.id) : saveService(values));
-    navigate('/admin/services');
+    setSaving(true);
+    try {
+      toast(await saveService(values, isEditing ? service.id : undefined));
+      navigate('/admin/services');
+    } catch (error) { toast(error.message); }
+    finally { setSaving(false); }
   }
 
   return (
@@ -204,11 +207,11 @@ function ServiceForm({ service }) {
           >
             <input type="text" required maxLength={NAME_MAX} value={form.name} onChange={update('name')} {...fieldProps('name', { error: errors.name })} />
           </FormField>
-          <FormField id="desc" label="Description" className="form-wide" error={errors.desc}>
-            <textarea required maxLength={DESCRIPTION_MAX} value={form.desc} onChange={update('desc')} {...fieldProps('desc', { error: errors.desc, hint: true })} />
+          <FormField id="description" label="Description" className="form-wide" error={errors.description}>
+            <textarea required maxLength={DESCRIPTION_MAX} value={form.description} onChange={update('description')} {...fieldProps('description', { error: errors.description, hint: true })} />
           </FormField>
-          <FormField id="duration" label="Expected duration" suffix="minutes per visit" error={errors.duration}>
-            <input type="number" required min="1" step="1" inputMode="numeric" value={form.duration} onChange={update('duration')} {...fieldProps('duration', { error: errors.duration })} />
+          <FormField id="expectedDuration" label="Expected duration" suffix="minutes per visit" error={errors.expectedDuration}>
+            <input type="number" required min="1" step="1" inputMode="numeric" value={form.expectedDuration} onChange={update('expectedDuration')} {...fieldProps('expectedDuration', { error: errors.expectedDuration })} />
           </FormField>
           <FormField id="location" label="Location" hint="Building, room number, or virtual service details." error={errors.location}>
             <input type="text" required maxLength={LOCATION_MAX} value={form.location} onChange={update('location')} {...fieldProps('location', { error: errors.location, hint: true })} />
@@ -247,12 +250,12 @@ function ServiceForm({ service }) {
         </div>
         {!isEditing && (
           <label className="check">
-            <input type="checkbox" checked={form.open} onChange={update('open')} />
+            <input type="checkbox" checked={form.isOpen} onChange={update('isOpen')} />
             Open for new visitors right away
           </label>
         )}
         <div className="form-actions">
-          <button type="submit" className="btn btn-primary">{isEditing ? 'Save changes' : 'Create service'}</button>
+          <button type="submit" disabled={saving} className="btn btn-primary">{isEditing ? 'Save changes' : 'Create service'}</button>
           <Link to="/admin/services" className="btn btn-secondary">Cancel</Link>
         </div>
       </form>

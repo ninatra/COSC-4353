@@ -9,23 +9,23 @@ import { queueOf } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
 import { people } from '../utils/format.js';
 
-const PRIORITY = { low: 'Low priority', medium: 'Medium priority', high: 'High priority' };
-const PRIORITY_ORDER = { high: 0, medium: 1, low: 2 };
+const PRIORITY = { LOW: 'Low priority', MEDIUM: 'Medium priority', HIGH: 'High priority' };
+const PRIORITY_ORDER = { HIGH: 0, MEDIUM: 1, LOW: 2 };
 
 export default function AdminOverview() {
   const { state, toggleOpen } = useQueues();
   const confirm = useConfirm();
   const toast = useToast();
 
-  const openCount = state.services.filter((s) => s.open).length;
+  const openCount = state.services.filter((s) => s.isOpen).length;
   const waitingTotal = state.services.reduce((sum, s) => sum + queueOf(state, s.id).length, 0);
   const services = [...state.services].sort((a, b) => {
-    if (a.open !== b.open) return a.open ? -1 : 1;
+    if (a.isOpen !== b.isOpen) return a.isOpen ? -1 : 1;
     return (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3);
   });
 
   async function handleToggle(service) {
-    if (service.open) {
+    if (service.isOpen) {
       const waiting = queueOf(state, service.id).length;
       const ok = await confirm({
         title: `Close ${service.name}?`,
@@ -36,7 +36,7 @@ export default function AdminOverview() {
       });
       if (!ok) return;
     }
-    toast(toggleOpen(service.id));
+    try { toast(await toggleOpen(service.id)); } catch (error) { toast(error.message); }
   }
 
   return (
@@ -88,7 +88,7 @@ export default function AdminOverview() {
               const waiting = line.length;
               return (
                 <Fragment key={s.id}>
-                  {!s.open && (index === 0 || services[index - 1].open) && (
+                  {!s.isOpen && (index === 0 || services[index - 1].isOpen) && (
                     <tr className="ops-section-row">
                       <th colSpan="6">Closed services</th>
                     </tr>
@@ -99,16 +99,16 @@ export default function AdminOverview() {
                         <ServiceTile service={s} size="sm" />
                         <div>
                           <Link to={`/admin/queues/${s.id}`}>{s.name}</Link>
-                          <span className={`prio priority-${s.priority}`}>{PRIORITY[s.priority]}</span>
+                          <span className={`prio priority-${s.priority.toLowerCase()}`}>{PRIORITY[s.priority]}</span>
                         </div>
                       </div>
                     </th>
                     <td data-label="Status">
                       <div className="status-cell">
-                        <StatusLabel status={s.open ? 'open' : 'closed'} />
+                        <StatusLabel status={s.isOpen ? 'open' : 'closed'} />
                         <button type="button" className="toggle-link" onClick={() => handleToggle(s)}>
-                          <Icon name={s.open ? 'lock' : 'lock-open'} />
-                          {s.open ? 'Close queue' : 'Open queue'}
+                          <Icon name={s.isOpen ? 'lock' : 'lock-open'} />
+                          {s.isOpen ? 'Close queue' : 'Open queue'}
                           <span className="sr-only">: {s.name}</span>
                         </button>
                       </div>
@@ -117,10 +117,10 @@ export default function AdminOverview() {
                       {waiting}
                     </td>
                     <td data-label="Per visit" className="num">
-                      {s.duration} min
+                      {s.expectedDuration} min
                     </td>
                     <td data-label="Next joiner waits" className="num">
-                      {waiting * s.duration} min
+                      {waiting * s.expectedDuration} min
                     </td>
                     <td>
                       <div className="row-actions">

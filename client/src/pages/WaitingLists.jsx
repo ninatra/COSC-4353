@@ -134,9 +134,9 @@ export default function WaitingLists() {
         <div>
           <h2>{service.name}</h2>
           <p className="meta">
-            <StatusLabel status={service.open ? 'open' : 'closed'} />
+            <StatusLabel status={service.isOpen ? 'open' : 'closed'} />
             <span>{people(line.length)} waiting</span>
-            <span>{service.duration} min per visit</span>
+            <span>{service.expectedDuration} min per visit</span>
           </p>
         </div>
         <button type="button" className="btn btn-primary" id="serve-next" onClick={() => setServingVisitor(line[0])} disabled={!line.length}>
@@ -150,10 +150,9 @@ export default function WaitingLists() {
           <form className="dlg-inner serve-form" onSubmit={handleServeSubmit}>
             <h2>Complete visit</h2>
             <p>{servingVisitor.name} · <span className="mono">{servingVisitor.id}</span></p>
-            <label htmlFor="visit-problem">Problem</label>
+            <label htmlFor="visit-problem">Problem (optional)</label>
             <textarea
               id="visit-problem"
-              required
               maxLength={500}
               value={completion.problem}
               onChange={(event) => setCompletion({ ...completion, problem: event.target.value })}
@@ -223,7 +222,7 @@ export default function WaitingLists() {
                 {i === 0 && <span className="tag tag-next">Next</span>}
                 {v.email && <span className="tag tag-you">Signed-in user</span>}
                 <div className="qmeta">
-                  <span className="mono">{v.id}</span> · joined {fmtTime(v.joinedAt)} · waits {i * service.duration} min
+                  <span className="mono">{v.id}</span> · joined {fmtTime(v.joinedAt)} · waits {i * service.expectedDuration} min
                 </div>
               </div>
               <div className="qactions">
@@ -264,7 +263,7 @@ export default function WaitingLists() {
         <EmptyState
           icon="users"
           title="Nobody is waiting"
-          body={service.open ? 'New visitors appear here as soon as they join.' : 'This queue is closed, so nobody can join until you open it.'}
+          body={service.isOpen ? 'New visitors appear here as soon as they join.' : 'This queue is closed, so nobody can join until you open it.'}
         />
       )}
     </>

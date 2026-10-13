@@ -37,6 +37,10 @@ The current front end remains a browser-local simulation after sign-in. The serv
 
 API: `server/src/routes/services.js`, mounted at `/api/services`
 
+Backend implemented: authenticated catalog listing for both roles (including closed services), admin-only creation and partial updates including open/close, input
+validation, and direct unit tests for validation and service IDs. Frontend service listing, creation, editing, open/close, and deletion now use the API. Overall backend coverage remains to be assessed
+as tests for authentication, route handlers, and queue logic are added.
+
 - `GET /api/services` for any logged-in user, listing open services
 - `POST /api/services` for admins only, creating a service (name, description, expectedDuration, priority)
 - `PUT /api/services/:id` for admins only, editing a service or opening/closing it

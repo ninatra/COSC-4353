@@ -38,7 +38,7 @@ export default function ServiceDetail() {
   }
 
   const waiting = queueOf(state, service.id).length;
-  const wait = waiting * service.duration;
+  const wait = waiting * service.expectedDuration;
   const ticket = ticketOf(state, user.email);
   const inThisLine = ticket?.status === 'waiting' && ticket.serviceId === service.id;
   const inAnotherLine = ticket?.status === 'waiting' && ticket.serviceId !== service.id;
@@ -55,14 +55,14 @@ export default function ServiceDetail() {
       <>
         <h2>You're in this line</h2>
         <p>
-          You're {pad(position)} in line with an estimated wait of {(position - 1) * service.duration} min.
+          You're {pad(position)} in line with an estimated wait of {(position - 1) * service.expectedDuration} min.
         </p>
         <Link to="/ticket" className="btn btn-primary">
           View your ticket<span aria-hidden="true">&nbsp;→</span>
         </Link>
       </>
     );
-  } else if (!service.open) {
+  } else if (!service.isOpen) {
     panel = (
       <>
         <h2>Closed to new visitors</h2>
@@ -112,18 +112,18 @@ export default function ServiceDetail() {
       <div className="detail-head">
         <ServiceTile service={service} size="lg" />
         <div>
-          <StatusLabel status={service.open ? 'open' : 'closed'} />
+          <StatusLabel status={service.isOpen ? 'open' : 'closed'} />
           <h1 id="page-title" tabIndex={-1} className="detail-title">
             {service.name}
           </h1>
         </div>
       </div>
-      <p className="lead">{service.desc}</p>
+      <p className="lead">{service.description}</p>
       <div className="split">
         <dl className="details">
           <div>
             <dt>Availability</dt>
-            <dd className="small">{service.open ? 'Open · accepting new visitors' : 'Closed · not accepting new visitors'}</dd>
+            <dd className="small">{service.isOpen ? 'Open · accepting new visitors' : 'Closed · not accepting new visitors'}</dd>
           </div>
           <div>
             <dt>How busy</dt>
@@ -133,7 +133,7 @@ export default function ServiceDetail() {
           </div>
           <div>
             <dt>Expected visit length</dt>
-            <dd>{service.duration} min</dd>
+            <dd>{service.expectedDuration} min</dd>
           </div>
           <div>
             <dt>People waiting</dt>

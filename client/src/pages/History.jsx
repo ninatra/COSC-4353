@@ -166,8 +166,8 @@ function AdminHistory({ rows, state }) {
           <form className="dlg-inner serve-form" onSubmit={saveEdit}>
             <h2>Edit visit history</h2>
             <p>{editing.visitorName ?? editing.email ?? 'Walk-in'} · <span className="mono">{editing.ticketId}</span></p>
-            <label htmlFor="history-problem">Problem</label>
-            <textarea id="history-problem" required maxLength={500} value={draft.problem} onChange={(event) => setDraft({ ...draft, problem: event.target.value })} placeholder="What did the student need help with?" />
+            <label htmlFor="history-problem">Problem (optional)</label>
+            <textarea id="history-problem" maxLength={500} value={draft.problem} onChange={(event) => setDraft({ ...draft, problem: event.target.value })} placeholder="What did the student need help with?" />
             <label htmlFor="history-outcome">Outcome</label>
             <select id="history-outcome" value={draft.outcome} onChange={(event) => setDraft({ ...draft, outcome: event.target.value })}>
               <option value="completed">Completed</option>
