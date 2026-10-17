@@ -2,6 +2,7 @@
 // Safe to run more than once.
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
+import { formatTicketId, positionInQueue } from '../src/logic/queue.js';
 
 const prisma = new PrismaClient();
 
@@ -76,6 +77,45 @@ async function main() {
     if (Object.keys(data).length) await prisma.service.update({ where: { id: service.id }, data });
   }
 
+  const queuePlans = {
+    'Academic Advising': ['Maya Chen', 'Jordan Lee', 'Sofia Garcia', 'Grace Park', 'Hao Pham'],
+    'Financial Aid': ['Liam Patel', 'Emma Wilson', 'Noah Davis', 'Daniel Rivera'],
+    'IT Help Desk': ['Olivia Nguyen', 'Ethan Brown', 'Ava Martinez'],
+  };
+  const resetQueues = process.argv.includes('--reset-queues');
+  let added = 0;
+  for (const [serviceName, names] of Object.entries(queuePlans)) {
+    const service = await prisma.service.findFirst({ where: { name: serviceName }, orderBy: { id: 'asc' } });
+    if (!service) continue;
+    await prisma.$transaction(async (db) => {
+      if (resetQueues) {
+        // Explicit demo reset preserves past visits while replacing these queues.
+        await db.queueEntry.updateMany({
+          where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } },
+          data: { status: 'LEFT', completedAt: new Date() },
+        });
+      }
+      for (const [slot, name] of names.entries()) {
+        const email = name === 'Hao Pham' ? 'user@queuesmart.dev' : `demo-visitor-${service.id}-${slot + 1}@queuesmart.dev`;
+        const visitor = await db.user.upsert({
+          where: { email }, update: { name },
+          create: { name, email, passwordHash, role: 'USER', emailVerified: true },
+        });
+        if (resetQueues) {
+          await db.queueEntry.updateMany({ where: { userId: visitor.id, status: { in: ['WAITING', 'SERVING'] } }, data: { status: 'LEFT', completedAt: new Date() } });
+        } else if (await db.queueEntry.findFirst({ where: { userId: visitor.id } })) continue;
+        const waiting = await db.queueEntry.count({ where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } } });
+        if (service.maxCapacity !== null && waiting >= service.maxCapacity) break;
+        const entry = await db.queueEntry.create({ data: { userId: visitor.id, serviceId: service.id, priority: 'MEDIUM' } });
+        const entries = await db.queueEntry.findMany({ where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } } });
+        const { position } = positionInQueue(entries, entry.id, service.expectedDuration);
+        await db.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id), initialPosition: position } });
+        added++;
+      }
+    });
+  }
+
+  console.log(`Added ${added} demo visitors.`);
   console.log('Seeded demo data. Log in with admin@queuesmart.dev or user@queuesmart.dev / password123');
 }
 

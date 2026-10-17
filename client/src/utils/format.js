@@ -30,3 +30,11 @@ export function hashTint(name) {
 }
 
 export const firstName = (name) => name.trim().split(/\s+/)[0] || 'there';
+
+// Compact duration for queue wait estimates.
+export function formatWait(minutes) {
+  const total = Math.max(0, Math.round(minutes));
+  if (total < 60) return `${total} min`;
+  const remainder = total % 60;
+  return `${Math.floor(total / 60)} hr${remainder ? ` ${remainder} min` : ''}`;
+}

@@ -31,7 +31,7 @@ Done:
 - [x] In-app notifications with unread badges, mark-read, and clear-history controls
 - [x] Waiting-list drag-and-drop reordering with arrow-button fallback
 
-The current front end remains a browser-local simulation after sign-in. The service and queue screens below describe the planned server-backed version.
+Services and queues now use the backend. History and notification screens still use browser-local demo data.
 
 ## 1. Service management (admin)
 
@@ -41,7 +41,7 @@ Backend implemented: authenticated catalog listing for both roles (including clo
 validation, and direct unit tests for validation and service IDs. Frontend service listing, creation, editing, open/close, and deletion now use the API. Overall backend coverage remains to be assessed
 as tests for authentication, route handlers, and queue logic are added.
 
-- `GET /api/services` for any logged-in user, listing open services
+- `GET /api/services` for any logged-in user, listing the service catalog
 - `POST /api/services` for admins only, creating a service (name, description, expectedDuration, priority)
 - `PUT /api/services/:id` for admins only, editing a service or opening/closing it
 - Protect admin routes with `requireAuth, requireRole('ADMIN')` from `middleware/auth.js`
@@ -52,17 +52,18 @@ Client demo: a service list plus a responsive create/edit form on the Admin dash
 
 API: `server/src/routes/queues.js`
 
-- `POST /api/queues/:serviceId/join` creates a `QueueEntry` with status `WAITING`. Reject the request if the user is already waiting in that queue.
+- `POST /api/queues/:serviceId/join` creates a `WAITING` entry. Reject closed/full services or any existing active entry for that user.
 - `POST /api/queues/:serviceId/leave` sets the status to `LEFT` and stamps `completedAt`.
-- `GET /api/queues/me` returns the user's active entries with their position and estimated wait.
+- `GET /api/queues` returns queue snapshots with other users' identities hidden from non-admins.
+- `GET /api/queues/me` returns the user's active entry with position and estimated wait.
 - `GET /api/queues/:serviceId` (admin) returns the ordered list of waiting users.
-- `POST /api/queues/:serviceId/serve-next` (admin) marks the current `SERVING` entry as `SERVED`, then moves the next `WAITING` entry to `SERVING`.
+- `POST /api/queues/:serviceId/serve-next` (admin) completes the next visitor as `SERVED`, storing optional problem/notes and the outcome.
 
 **Ordering rule:** sort by priority (HIGH, then MEDIUM, then LOW), then by `joinedAt`, oldest first.
 
 **Estimated wait:** people ahead × `service.expectedDuration`. A later improvement is to use the average of real service times (`completedAt - servedAt`) from recent `SERVED` entries.
 
-Client demo: users can join or leave queues and see their position and wait time. Admins can serve the next visitor through a completion form, record a problem/outcome/notes, drag visitors to new positions, or use the arrow controls. A real server version should poll every 10–15 seconds so numbers stay current.
+Implemented: API-backed join/leave, admin queue viewing and completion, transactional writes, queue-rule unit tests, and polling every 10 seconds. Standard joins use MEDIUM priority; users cannot choose their own priority. Admin reordering is saved through `PUT /api/queues/:serviceId/reorder`; manual order takes precedence and new visitors append. Drag-and-drop and arrow controls are available. Visitor removal remains pending. Backend history/notification screen integration remains pending.
 
 ## 3. Notifications
 

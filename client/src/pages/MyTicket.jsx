@@ -65,7 +65,7 @@ export default function MyTicket() {
       danger: true,
     });
     if (ok) {
-      toast(leave(user.email));
+      try { toast(await leave()); } catch (error) { toast(error.message); }
       document.getElementById('page-title')?.focus();
     }
   }

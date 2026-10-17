@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext.jsx';
 import { positionOf, queueOf, ticketOf } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
-import { pad } from '../utils/format.js';
+import { formatWait, pad } from '../utils/format.js';
 import CrowdMeter from './CrowdMeter.jsx';
 import EmptyState from './EmptyState.jsx';
 import ServiceTile from './ServiceTile.jsx';
@@ -27,7 +27,7 @@ export default function ServiceCard({ service }) {
         <dl className="stats">
           <div>
             <dt>Est. wait</dt>
-            <dd>{waiting * service.expectedDuration} min</dd>
+            <dd>{formatWait(waiting * service.expectedDuration)}</dd>
           </div>
           <div>
             <dt>Waiting</dt>
@@ -43,7 +43,7 @@ export default function ServiceCard({ service }) {
         {mine && (
           <p className="svc-mine">
             <span className="lime-dot" aria-hidden="true" />
-            You're {pad(positionOf(state, user.email))} in this line
+            You're at position {pad(positionOf(state, user.email))} in this line
           </p>
         )}
       </div>

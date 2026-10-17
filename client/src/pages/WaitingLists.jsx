@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useConfirm } from '../components/ConfirmDialog.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import Icon from '../components/Icon.jsx';
 import ServiceTile from '../components/ServiceTile.jsx';
@@ -8,21 +7,24 @@ import StatusLabel from '../components/StatusLabel.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { findService, queueOf } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
-import { useFocusAfterRender } from '../useFocusAfterRender.js';
-import { fmtTime, hashTint, initials, pad, people } from '../utils/format.js';
+import { DEMO_EMAIL } from '../mockData.js';
+import { formatWait, fmtTime, hashTint, initials, pad, people } from '../utils/format.js';
 
 export default function WaitingLists() {
   const { serviceId } = useParams();
-  const { state, serveNext, move, moveTo, removeVisitor } = useQueues();
+  const { state, serveNext, reorderQueue } = useQueues();
   const navigate = useNavigate();
-  const confirm = useConfirm();
   const toast = useToast();
-  const focusLater = useFocusAfterRender();
-  const [draggedId, setDraggedId] = useState(null);
-  const [dropIndex, setDropIndex] = useState(null);
   const [servingVisitor, setServingVisitor] = useState(null);
   const [completion, setCompletion] = useState({ outcome: 'completed', problem: '', notes: '' });
   const serveDialogRef = useRef(null);
+  const [saving, setSaving] = useState(false);
+  const [dragged, setDragged] = useState(null);
+  const [dropTarget, setDropTarget] = useState(null);
+  const dragOrder = useRef([]);
+  useEffect(() => {
+    if (servingVisitor) serveDialogRef.current?.showModal();
+  }, [servingVisitor]);
 
   const service = findService(state, serviceId) ?? state.services[0];
   const heading = (
@@ -44,71 +46,34 @@ export default function WaitingLists() {
 
   const line = queueOf(state, service.id);
 
-  useEffect(() => {
-    if (!servingVisitor) return;
-    serveDialogRef.current?.showModal();
-  }, [servingVisitor]);
+  async function moveVisitor(entryId, targetIndex, previousIds = line.map(v => v.entryId)) {
+    if (saving || targetIndex < 0 || targetIndex >= previousIds.length) return;
+    const ids = [...previousIds];
+    const from = ids.indexOf(entryId);
+    if (from < 0 || from === targetIndex) return;
+    ids.splice(targetIndex, 0, ...ids.splice(from, 1));
+    setSaving(true);
+    try { toast(await reorderQueue(service.id, ids, previousIds)); }
+    catch (error) { toast(error.message); }
+    finally { setSaving(false); }
+  }
 
-  function handleServeSubmit(event) {
+  async function handleServeSubmit(event) {
     event.preventDefault();
-    serveDialogRef.current?.close();
-    toast(serveNext(service.id, completion));
-    setServingVisitor(null);
-    setCompletion({ outcome: 'completed', problem: '', notes: '' });
-    focusLater(line.length > 1 ? 'serve-next' : 'page-title');
+    setSaving(true);
+    try {
+      toast(await serveNext(service.id, completion, servingVisitor.entryId));
+      serveDialogRef.current?.close();
+      setServingVisitor(null);
+      setCompletion({ outcome: 'completed', problem: '', notes: '' });
+    } catch (error) { toast(error.message); }
+    finally { setSaving(false); }
   }
 
   function handleServeCancel() {
     serveDialogRef.current?.close();
     setServingVisitor(null);
     setCompletion({ outcome: 'completed', problem: '', notes: '' });
-  }
-
-  // Keep focus on the moved row; at the top or bottom, switch to the other arrow.
-  function handleMove(visitor, index, direction) {
-    move(service.id, visitor.id, direction);
-    const to = index + direction;
-    const atEdge = (direction < 0 && to === 0) || (direction > 0 && to === line.length - 1);
-    const sameArrow = direction < 0 ? 'up' : 'down';
-    const otherArrow = direction < 0 ? 'down' : 'up';
-    focusLater(`${atEdge ? otherArrow : sameArrow}-${visitor.id}`);
-  }
-
-  function handleDrop() {
-    if (!draggedId) return;
-    const from = line.findIndex((visitor) => visitor.id === draggedId);
-    if (dropIndex !== null && dropIndex !== from) moveTo(service.id, draggedId, dropIndex);
-    setDraggedId(null);
-    setDropIndex(null);
-  }
-
-  function handleDragEnd() {
-    setDraggedId(null);
-    setDropIndex(null);
-  }
-
-  const previewLine = draggedId && dropIndex !== null
-    ? (() => {
-        const next = [...line];
-        const from = next.findIndex((visitor) => visitor.id === draggedId);
-        if (from < 0 || from === dropIndex) return next;
-        const [visitor] = next.splice(from, 1);
-        next.splice(dropIndex, 0, visitor);
-        return next;
-      })()
-    : line;
-
-  async function handleRemove(visitor, index) {
-    const ok = await confirm({
-      title: `Remove ${visitor.name}?`,
-      body: `${visitor.name} (${visitor.id}) loses their place in ${service.name}. If they rejoin, they start at the end of the line.`,
-      confirmLabel: 'Remove visitor',
-      danger: true,
-    });
-    if (!ok) return;
-    const next = line[index + 1] ?? line[index - 1];
-    toast(removeVisitor(service.id, visitor.id));
-    focusLater(next ? `remove-${next.id}` : 'page-title');
   }
 
   return (
@@ -118,6 +83,7 @@ export default function WaitingLists() {
         {state.services.map((s) => (
           <button
             key={s.id}
+            disabled={saving || Boolean(dragged)}
             type="button"
             className="qtab"
             aria-pressed={s.id === service.id}
@@ -139,7 +105,7 @@ export default function WaitingLists() {
             <span>{service.expectedDuration} min per visit</span>
           </p>
         </div>
-        <button type="button" className="btn btn-primary" id="serve-next" onClick={() => setServingVisitor(line[0])} disabled={!line.length}>
+        <button type="button" className="btn btn-primary" id="serve-next" onClick={() => setServingVisitor(line[0])} disabled={!line.length || saving}>
           <Icon name="circle-check" />
           Serve next{line.length ? ` · ${line[0].id}` : ''}
         </button>
@@ -179,36 +145,39 @@ export default function WaitingLists() {
             />
             <div className="dlg-actions">
               <button type="button" className="btn btn-secondary" onClick={handleServeCancel}>Cancel</button>
-              <button type="submit" className="btn btn-primary">Complete visit</button>
+              <button type="submit" disabled={saving} className="btn btn-primary">Complete visit</button>
             </div>
           </form>
         )}
       </dialog>
 
+      {line.length > 1 && <p className="muted">Drag visitors to reorder, or use the arrow buttons. New visitors join at the end after manual reordering.</p>}
       {line.length ? (
         <ol className="qlist" aria-label={`${service.name} waiting list`}>
-          {previewLine.map((v, i) => (
+          {line.map((v, i) => (
             <li
               key={v.id}
-              className={`qrow ${i === 0 ? 'is-next' : ''} ${v.email ? 'is-you' : ''} ${draggedId === v.id ? 'is-dragging' : ''}`}
-              draggable
+              className={`qrow ${i === 0 ? 'is-next' : ''} ${dragged === v.entryId ? 'is-dragging' : ''} ${dropTarget === v.entryId ? 'is-drop-target' : ''}`}
+              draggable={!saving && !servingVisitor}
               onDragStart={(event) => {
+                if (event.target.closest('button')) { event.preventDefault(); return; }
                 event.dataTransfer.effectAllowed = 'move';
-                event.dataTransfer.setData('text/plain', v.id);
-                setDraggedId(v.id);
+                event.dataTransfer.setData('text/plain', String(v.entryId));
+                dragOrder.current = line.map(visitor => visitor.entryId);
+                setDragged(v.entryId);
               }}
-              onDragEnd={handleDragEnd}
               onDragOver={(event) => {
+                if (dragged === null || dragged === v.entryId) return;
                 event.preventDefault();
-                if (v.id === draggedId) return;
-                const from = line.findIndex((visitor) => visitor.id === draggedId);
-                const target = line.findIndex((visitor) => visitor.id === v.id);
-                const beforeTarget = event.clientY < event.currentTarget.getBoundingClientRect().top + event.currentTarget.offsetHeight / 2;
-                const rawIndex = target + (beforeTarget ? 0 : 1);
-                const destination = rawIndex > from ? rawIndex - 1 : rawIndex;
-                if (destination !== from) setDropIndex(destination);
+                event.dataTransfer.dropEffect = 'move';
+                setDropTarget(v.entryId);
               }}
-              onDrop={handleDrop}
+              onDrop={(event) => {
+                event.preventDefault();
+                if (dragged !== null) moveVisitor(dragged, dragOrder.current.indexOf(v.entryId), dragOrder.current);
+                setDragged(null); setDropTarget(null);
+              }}
+              onDragEnd={() => { setDragged(null); setDropTarget(null); }}
             >
               <span className="qpos" aria-hidden="true">
                 {pad(i + 1)}
@@ -220,41 +189,14 @@ export default function WaitingLists() {
                 <span className="sr-only">Position {i + 1}: </span>
                 <span className="qname">{v.name}</span>
                 {i === 0 && <span className="tag tag-next">Next</span>}
-                {v.email && <span className="tag tag-you">Signed-in user</span>}
+                {v.email === DEMO_EMAIL && <span className="tag tag-you">Signed-in user</span>}
                 <div className="qmeta">
-                  <span className="mono">{v.id}</span> · joined {fmtTime(v.joinedAt)} · waits {i * service.expectedDuration} min
+                  <span className="mono">{v.id}</span> · joined {fmtTime(v.joinedAt)} · waits {formatWait(i * service.expectedDuration)}
                 </div>
               </div>
               <div className="qactions">
-                <button
-                  type="button"
-                  className="icon-btn"
-                  id={`up-${v.id}`}
-                  aria-label={`Move ${v.name} up`}
-                  disabled={i === 0}
-                  onClick={() => handleMove(v, i, -1)}
-                >
-                  <Icon name="chevron-up" />
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn"
-                  id={`down-${v.id}`}
-                  aria-label={`Move ${v.name} down`}
-                  disabled={i === line.length - 1}
-                  onClick={() => handleMove(v, i, 1)}
-                >
-                  <Icon name="chevron-down" />
-                </button>
-                <button
-                  type="button"
-                  className="icon-btn danger"
-                  id={`remove-${v.id}`}
-                  aria-label={`Remove ${v.name}`}
-                  onClick={() => handleRemove(v, i)}
-                >
-                  <Icon name="x" />
-                </button>
+                <button type="button" className="icon-btn" aria-label={`Move ${v.name} up`} disabled={saving || Boolean(servingVisitor) || i === 0} onClick={() => moveVisitor(v.entryId, i - 1)}><Icon name="chevron-up" /></button>
+                <button type="button" className="icon-btn" aria-label={`Move ${v.name} down`} disabled={saving || Boolean(servingVisitor) || i === line.length - 1} onClick={() => moveVisitor(v.entryId, i + 1)}><Icon name="chevron-down" /></button>
               </div>
             </li>
           ))}

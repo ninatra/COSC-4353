@@ -7,7 +7,7 @@ import StatusLabel from '../components/StatusLabel.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { findService, positionOf, queueOf, ticketOf } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
-import { pad } from '../utils/format.js';
+import { formatWait, pad } from '../utils/format.js';
 
 function BackLink() {
   return (
@@ -44,9 +44,11 @@ export default function ServiceDetail() {
   const inAnotherLine = ticket?.status === 'waiting' && ticket.serviceId !== service.id;
   const position = positionOf(state, user.email);
 
-  function handleJoin() {
-    toast(join(service.id, { name: user.name, email: user.email }));
-    navigate('/ticket');
+  async function handleJoin() {
+    try {
+      toast(await join(service.id));
+      navigate('/ticket');
+    } catch (error) { toast(error.message); }
   }
 
   let panel;
@@ -55,7 +57,7 @@ export default function ServiceDetail() {
       <>
         <h2>You're in this line</h2>
         <p>
-          You're {pad(position)} in line with an estimated wait of {(position - 1) * service.expectedDuration} min.
+          You're {pad(position)} in line with an estimated wait of {formatWait((position - 1) * service.expectedDuration)}.
         </p>
         <Link to="/ticket" className="btn btn-primary">
           View your ticket<span aria-hidden="true">&nbsp;→</span>
@@ -90,7 +92,7 @@ export default function ServiceDetail() {
       <>
         <h2>Join this line</h2>
         <p>
-          You'd be {pad(waiting + 1)} in line with about {wait} min to wait.
+          You'd be {pad(waiting + 1)} in line with about {formatWait(wait)} to wait.
         </p>
         <div className="mini-line" aria-hidden="true">
           {Array.from({ length: Math.min(waiting, 8) }, (_, i) => (
@@ -141,7 +143,7 @@ export default function ServiceDetail() {
           </div>
           <div>
             <dt>Estimated wait if you join now</dt>
-            <dd>{wait} min</dd>
+            <dd>{formatWait(wait)}</dd>
           </div>
           {service.location && (
             <div>

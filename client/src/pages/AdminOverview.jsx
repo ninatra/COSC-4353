@@ -7,7 +7,7 @@ import StatusLabel from '../components/StatusLabel.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { queueOf } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
-import { people } from '../utils/format.js';
+import { formatWait, people } from '../utils/format.js';
 
 const PRIORITY = { LOW: 'Low priority', MEDIUM: 'Medium priority', HIGH: 'High priority' };
 const PRIORITY_ORDER = { HIGH: 0, MEDIUM: 1, LOW: 2 };
@@ -120,7 +120,7 @@ export default function AdminOverview() {
                       {s.expectedDuration} min
                     </td>
                     <td data-label="Next joiner waits" className="num">
-                      {waiting * s.expectedDuration} min
+                      {formatWait(waiting * s.expectedDuration)}
                     </td>
                     <td>
                       <div className="row-actions">

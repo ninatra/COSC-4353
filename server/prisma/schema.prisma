@@ -48,6 +48,9 @@ model Service {
 // double as the user's queue history and the source for admin statistics.
 model QueueEntry {
   id          Int       @id @default(autoincrement())
+  ticketId    String?
+  manualOrder Int? // admin order overrides priority/arrival; new visitors append
+  initialPosition Int? // position at join, used for progress toward the front
   userId      Int
   serviceId   Int
   priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH
@@ -55,6 +58,9 @@ model QueueEntry {
   joinedAt    DateTime  @default(now())
   servedAt    DateTime? // when service started
   completedAt DateTime? // when service ended or the user left
+  problem     String    @default("")
+  outcome     String?
+  notes       String    @default("")
 
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)

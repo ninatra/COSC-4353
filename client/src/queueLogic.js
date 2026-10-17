@@ -37,8 +37,8 @@ export function ticketStatus(state, email) {
 // 0 = no line, 1 = quiet, 2 = moderate, 3 = busy
 export function crowdLevel(waitMinutes) {
   if (waitMinutes === 0) return 0;
-  if (waitMinutes <= 15) return 1;
-  if (waitMinutes <= 35) return 2;
+  if (waitMinutes <= 30) return 1;
+  if (waitMinutes <= 60) return 2;
   return 3;
 }
 

@@ -2,6 +2,7 @@ import cors from 'cors';
 import express from 'express';
 import authRoutes from './routes/auth.js';
 import serviceRoutes from './routes/services.js';
+import queueRoutes from './routes/queues.js';
 
 export const app = express();
 
@@ -11,9 +12,9 @@ app.use(express.json());
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/services', serviceRoutes);
+app.use('/api/queues', queueRoutes);
 
 // Routes still to build (see docs/ROADMAP.md):
-//   /api/queues         join, leave, position & wait time, admin serve-next
 //   /api/notifications  in-app notifications for the logged-in user
 //   /api/history        user history and admin statistics
 

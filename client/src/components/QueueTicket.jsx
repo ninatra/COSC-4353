@@ -121,15 +121,14 @@ function ActiveTicket({ ticket, service, status, position, lineLength, ahead, bu
         </h2>
         <div className="ticket-nums">
           <div>
-            <span key={`p${position}`} className={`big ${bump ? 'bump' : ''}`}>
-              {pad(shownPosition)}
-            </span>
+            <span key={`p${position}`} className={`big ${bump ? 'bump' : ''}`}>{pad(shownPosition)}</span>
             <span className="lbl">Position in line</span>
           </div>
           <div>
-            <span key={`w${position}`} className={`big ${bump ? 'bump' : ''}`}>
-              {shownWait}
-              <span className="unit">min</span>
+            <span key={`w${position}`} className={`big ${shownWait >= 60 ? 'ticket-time-long' : ''} ${bump ? 'bump' : ''}`}>
+              {shownWait >= 60 ? (
+                <>{Math.floor(shownWait / 60)}<span className="unit">hr</span>{shownWait % 60 > 0 && <>{' '}{shownWait % 60}<span className="unit">min</span></>}</>
+              ) : <>{shownWait}<span className="unit">min</span></>}
             </span>
             <span className="lbl">Estimated wait</span>
           </div>

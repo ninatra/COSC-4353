@@ -74,11 +74,11 @@ Useful commands:
 ## Front End (A2)
 
 - **Stack:** React + Vite with plain CSS (design tokens in `client/src/index.css`, light and dark themes) and lucide-react icons. React gives us reusable components for the ticket, service cards and dialogs; Vite keeps development fast; plain CSS with custom properties keeps the design system in one place without a UI kit.
-- **Mock data and simulation:** queue data is sample data kept in the browser (localStorage), not the server. A simulated clock starts at 10:05 AM and moves forward a few minutes with each action. Joining, leaving, serving, reordering and removing all update every screen and write to Updates.
+- **Backend integration:** services and queues use the API and SQLite. Queue changes refresh immediately; other devices refresh every 10 seconds. History and notification screens still use local demo data.
 - **Wait estimate:** people ahead × the service's expected visit length. This is a deliberate simplification for the demo.
 - **In-app notifications:** the bell and Notifications page display queue updates and status changes. Notifications are intentionally in-app only for this assignment; service configuration changes and queue reordering are not treated as alerts.
-- **Visit completion:** administrators record a required problem, an outcome (Completed, Referred elsewhere, Unresolved, or Follow-up needed), and optional notes before a visitor is removed from the active queue.
-- **Sign in and service management** use the real API and database. Queue operations still use mock data. **Reset demo** resets the local queue simulation and keeps server services.
+- **Visit completion:** administrators complete the next visitor with an outcome and optional problem/notes. Standard joins follow arrival order; stored entry priority is considered first. Admins can reorder queues with drag-and-drop or arrow buttons. Visitor removal remains pending.
+- **Reset demo** resets local history/notification demo state and preserves server services and queues.
 
 ## Project Structure
 
@@ -87,7 +87,7 @@ client/   React web app (Vite)
   src/pages/        One file per screen (user and admin)
   src/components/   Shared UI: app shell, ticket, service cards, dialogs
   src/AuthContext   Keeps track of the logged-in user
-  src/QueueContext  Shared mock queue data for the A2 screens
+  src/QueueContext  Shared API-backed service/queue state
 server/   Express REST API
   prisma/           Database schema and demo data
   src/routes/       API endpoints (/api/auth, ...)

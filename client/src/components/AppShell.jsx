@@ -217,7 +217,7 @@ export default function AppShell({ children }) {
   async function handleReset() {
     const ok = await confirm({
       title: 'Reset the demo?',
-      body: 'This restores the sample services, queues, ticket, and history. Anything you changed will be lost.',
+      body: 'This resets local demo history and notifications. Server services, queues, and tickets are kept.',
       confirmLabel: 'Reset demo',
       danger: true,
     });

@@ -4,8 +4,8 @@ import { actions } from './queueLogic.js';
 import { api } from './api.js';
 import { useAuth } from './AuthContext.jsx';
 
-// Services come from the API. Queue simulation is still saved locally until
-// the queue backend is implemented.
+// Services and queues come from the API. Notification/history demo state and
+// local display preferences remain in browser storage until those modules ship.
 const STORAGE_KEY = 'queuesmart_demo_v3';
 
 const QueueContext = createContext(null);
@@ -53,6 +53,8 @@ export function QueueProvider({ children }) {
       try {
         const next = normalizeServices(JSON.parse(event.newValue));
         next.services = latest.current.services;
+        next.queues = latest.current.queues;
+        next.tickets = latest.current.tickets;
         latest.current = next;
         setState(next);
       } catch {
@@ -76,26 +78,52 @@ export function QueueProvider({ children }) {
     setState(next);
   }
 
+  const dismissedTicket = useRef(null);
+  const requestVersion = useRef(0);
+  const account = useRef(user?.id);
+  account.current = user?.id;
+
+  async function refreshQueues() {
+    const version = ++requestVersion.current;
+    const owner = user?.id;
+    const [{ services }, snapshot] = await Promise.all([api('/services'), api('/queues')]);
+    if (version !== requestVersion.current || owner !== account.current) return;
+    const minutes = value => { const date = new Date(value); return date.getHours() * 60 + date.getMinutes(); };
+    const ticketId = entry => entry.ticketId;
+    const queues = Object.fromEntries(Object.entries(snapshot.queues).map(([id, entries]) => [id, entries.map(entry => ({
+      id: ticketId(entry), entryId: entry.id, name: entry.user?.name || 'Visitor', email: entry.user?.email,
+      joinedAt: minutes(entry.joinedAt), priority: entry.priority,
+    }))]));
+    const tickets = {};
+    const entry = snapshot.ticket;
+    if (entry && entry.id !== dismissedTicket.current) {
+      const previous = latest.current.tickets[user.email];
+      tickets[user.email] = { id: ticketId(entry), entryId: entry.id, serviceId: String(entry.serviceId),
+        status: entry.status === 'SERVED' ? 'served' : 'waiting', joinedAt: minutes(entry.joinedAt),
+        initialPosition: entry.initialPosition,
+        servedAt: entry.servedAt ? minutes(entry.servedAt) : null,
+        celebrated: previous?.entryId === entry.id ? previous.celebrated : false };
+    }
+    commit({ ...latest.current, services: services.map(displayService), queues, tickets });
+  }
+
   useEffect(() => {
     if (!user) return;
     let cancelled = false;
+    dismissedTicket.current = null;
     setServiceStatus({ owner: user.id, loading: true, error: '' });
     async function refresh() {
       try {
-        const { services } = await api('/services');
+        await refreshQueues();
         if (cancelled) return;
-        const displayed = services.map(displayService);
-        const ids = new Set(displayed.map(s => s.id));
-        const tickets = Object.fromEntries(Object.entries(latest.current.tickets).filter(([, ticket]) => ids.has(ticket.serviceId)));
-        commit({ ...latest.current, services: displayed, tickets });
         setServiceStatus({ owner: user.id, loading: false, error: '' });
       } catch (error) {
         if (!cancelled) setServiceStatus({ owner: user.id, loading: false, error: error.message });
       }
     }
     refresh();
-    const timer = setInterval(refresh, 15000);
-    return () => { cancelled = true; clearInterval(timer); };
+    const timer = setInterval(refresh, 10000);
+    return () => { cancelled = true; ++requestVersion.current; clearInterval(timer); };
   }, [user?.id, user?.role]);
 
   async function saveService(values, serviceId) {
@@ -128,6 +156,37 @@ export function QueueProvider({ children }) {
     return message;
   }
 
+  async function join(serviceId) {
+    await api(`/queues/${serviceId}/join`, { method: 'POST' });
+    await refreshQueues();
+    return 'You joined the queue';
+  }
+
+  async function leave() {
+    const ticket = latest.current.tickets[user.email];
+    if (!ticket) throw new Error('You are not waiting in a queue');
+    await api(`/queues/${ticket.serviceId}/leave`, { method: 'POST' });
+    await refreshQueues();
+    return 'You left the queue';
+  }
+
+  async function reorderQueue(serviceId, entryIds, previousIds) {
+    try {
+      await api(`/queues/${serviceId}/reorder`, { method: 'PUT', body: { entryIds, previousIds } });
+    } catch (error) {
+      await refreshQueues().catch(() => {});
+      throw error;
+    }
+    await refreshQueues();
+    return 'Queue order updated';
+  }
+
+  async function serveNext(serviceId, completion, entryId) {
+    await api(`/queues/${serviceId}/serve-next`, { method: 'POST', body: { ...completion, entryId } });
+    await refreshQueues();
+    return 'Visit completed';
+  }
+
   // Each action runs on a copy of the state and returns its toast message, if any.
   const run =
     (name) =>
@@ -141,12 +200,10 @@ export function QueueProvider({ children }) {
 
   const value = {
     state,
-    join: run('join'),
-    leave: run('leave'),
-    serveNext: run('serveNext'),
-    move: run('move'),
-    moveTo: run('moveTo'),
-    removeVisitor: run('removeVisitor'),
+    join,
+    leave,
+    serveNext,
+    reorderQueue,
     toggleOpen,
     saveService,
     deleteService,
@@ -154,10 +211,10 @@ export function QueueProvider({ children }) {
     clearUpdates: run('clearUpdates'),
     markUpdateRead: run('markUpdateRead'),
     markAllUpdatesRead: run('markAllUpdatesRead'),
-    dismissTicket: run('dismissTicket'),
+    dismissTicket: (email) => { dismissedTicket.current = latest.current.tickets[email]?.entryId; return run('dismissTicket')(email); },
     markCelebrated: run('markCelebrated'),
     resetDemo: () => {
-      latest.current = { ...seed(), services: latest.current.services, queues: {}, tickets: {}, counters: {} };
+      latest.current = { ...seed(), services: latest.current.services, queues: latest.current.queues, tickets: latest.current.tickets, counters: {} };
       setState(latest.current);
     },
   };
