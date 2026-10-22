@@ -63,21 +63,24 @@ API: `server/src/routes/queues.js`
 
 **Estimated wait:** people ahead × `service.expectedDuration`. A later improvement is to use the average of real service times (`completedAt - servedAt`) from recent `SERVED` entries.
 
-Implemented: API-backed join/leave, admin queue viewing and completion, transactional writes, queue-rule unit tests, and polling every 10 seconds. Standard joins use MEDIUM priority; users cannot choose their own priority. Admin reordering is saved through `PUT /api/queues/:serviceId/reorder`; manual order takes precedence and new visitors append. Drag-and-drop and arrow controls are available. Visitor removal remains pending. Backend history/notification screen integration remains pending.
+Implemented: API-backed join/leave, admin queue viewing and completion, transactional writes, queue-rule unit tests, and polling every 10 seconds. Standard joins use MEDIUM priority; users cannot choose their own priority. Admin reordering is saved through `PUT /api/queues/:serviceId/reorder`; manual order takes precedence and new visitors append. Drag-and-drop and arrow controls are available. Visitor removal remains pending.
 
 ## 3. Notifications
 
-- Build a helper `notify(userId, message)` that creates a `Notification` row.
-- Call it after every serve-next for anyone who is now position 1–2 ("You're almost up"), and whenever someone's status changes.
-- `GET /api/notifications` and `POST /api/notifications/:id/read`
-- Client demo: a bell icon with an unread count, a notification history page, individual mark-as-read controls, and clear-history confirmation. Queue updates and status changes are displayed in-app only.
-- Optional: send a real email too (Nodemailer + Mailtrap for testing).
+Done. Rules in `server/src/logic/notifications.js`, saved as `Notification` rows by the queue routes:
+
+- Joining: the visitor gets "Ticket confirmed" (position and wait); admins get "Visitor joined", plus "First visitor waiting" and "Queue at capacity" when they apply.
+- Reaching position 1 or 2 (after a join, leave, serve or reorder): one "Almost ready" notice per visit.
+- Served and left: a notice to the visitor.
+- `GET /api/notifications`, `PATCH /api/notifications/:id/read`, `PATCH /api/notifications/read-all`, `DELETE /api/notifications`
+- The bell, Notifications page and "While you wait" read from this API. In-app only; nothing is emailed.
+- Optional later: send a real email too (Nodemailer + Mailtrap for testing).
 
 ## 4. History and statistics
 
-- `GET /api/history` returns the user's own past `QueueEntry` rows.
-- `GET /api/stats` (admin) returns, per service: people served today, average wait (`servedAt - joinedAt`), the busiest hours, and the number of people who left.
-- Client demo: users have personal history; admins have visit history grouped by service, with visitor, ticket, problem, outcome, notes, and edit controls. Server-backed statistics remain planned.
+- Done: `GET /api/history` returns finished visits (served, left, removed): the user's own, or every visit for admins. `PUT /api/history/:id` (admin) edits a served visit's outcome, problem and notes. Rows are built in `server/src/logic/history.js`.
+- Still to do: `GET /api/stats` (admin) returns, per service: people served today, average wait (`servedAt - joinedAt`), the busiest hours, and the number of people who left.
+- Users see personal history; admins see visit history grouped by service, with edit controls. Both come from the API.
 
 ## Team workflow
 

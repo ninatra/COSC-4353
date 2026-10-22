@@ -95,10 +95,10 @@ function AdminHistory({ rows, state }) {
     setEditing(null);
   }
 
-  function saveEdit(event) {
+  async function saveEdit(event) {
     event.preventDefault();
     editDialogRef.current?.close();
-    toast(updateHistory(editing.historyIndex, draft));
+    try { toast(await updateHistory(editing.historyIndex, draft)); } catch (error) { toast(error.message); }
     setEditing(null);
   }
 

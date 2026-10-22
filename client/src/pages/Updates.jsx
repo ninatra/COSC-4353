@@ -6,6 +6,7 @@ import { fillService, notificationsFor, updatesFor } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
 import { fmtTime } from '../utils/format.js';
 import { useConfirm } from '../components/ConfirmDialog.jsx';
+import { useToast } from '../components/Toast.jsx';
 
 const UPDATE_STYLE = {
   'queue-active': ['user-plus', 'blue'], capacity: ['users', 'sun'],
@@ -19,6 +20,7 @@ export default function Updates() {
   const { user } = useAuth();
   const { state, clearUpdates, markUpdateRead, markAllUpdatesRead } = useQueues();
   const confirm = useConfirm();
+  const toast = useToast();
   const isAdmin = user.role === 'ADMIN';
   const audience = isAdmin ? 'admin' : user.email;
   const updates = updatesFor(state, audience);
@@ -31,7 +33,9 @@ export default function Updates() {
       confirmLabel: 'Clear notifications',
       danger: true,
     });
-    if (ok) clearUpdates(audience);
+    if (ok) {
+      try { await clearUpdates(audience); } catch (error) { toast(error.message); }
+    }
   }
 
   return (

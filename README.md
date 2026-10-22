@@ -74,11 +74,17 @@ Useful commands:
 ## Front End (A2)
 
 - **Stack:** React + Vite with plain CSS (design tokens in `client/src/index.css`, light and dark themes) and lucide-react icons. React gives us reusable components for the ticket, service cards and dialogs; Vite keeps development fast; plain CSS with custom properties keeps the design system in one place without a UI kit.
-- **Backend integration:** services and queues use the API and SQLite. Queue changes refresh immediately; other devices refresh every 10 seconds. History and notification screens still use local demo data.
+- **Backend integration:** services, queues, notifications and history all come from the API. Queue changes refresh immediately; other devices refresh every 10 seconds.
 - **Wait estimate:** people ahead × the service's expected visit length. This is a deliberate simplification for the demo.
 - **In-app notifications:** the bell and Notifications page display queue updates and status changes. Notifications are intentionally in-app only for this assignment; service configuration changes and queue reordering are not treated as alerts.
 - **Visit completion:** administrators complete the next visitor with an outcome and optional problem/notes. Standard joins follow arrival order; stored entry priority is considered first. Admins can reorder queues with drag-and-drop or arrow buttons. Visitor removal remains pending.
 - **Reset demo** resets local history/notification demo state and preserves server services and queues.
+
+## Back End (A3)
+
+- **Stack:** Node.js with Express 5 (REST API), Prisma with SQLite, bcryptjs for password hashing and JWT for login sessions. Tests use Node's built-in test runner.
+- **Modules:** authentication (`/api/auth`), service management (`/api/services`), queue management with wait-time estimates (`/api/queues`), notifications (`/api/notifications`) and history (`/api/history`). Business rules live in `server/src/logic/`; input validation lives in `server/src/validation/`.
+- **Tests:** `npm test -w server` runs unit tests for the rules and validation, plus route tests against a throwaway test database. `npm run test:coverage -w server` prints a coverage report for all server code.
 
 ## Project Structure
 
@@ -90,7 +96,10 @@ client/   React web app (Vite)
   src/QueueContext  Shared API-backed service/queue state
 server/   Express REST API
   prisma/           Database schema and demo data
-  src/routes/       API endpoints (/api/auth, ...)
+  src/routes/       API endpoints (auth, services, queues, notifications, history)
+  src/logic/        Queue, notification and history rules
+  src/validation/   Input checks for each module
+  test/             Unit and route tests
   src/middleware/   Login and role checks
 docs/     Design documents and the build roadmap
 ```

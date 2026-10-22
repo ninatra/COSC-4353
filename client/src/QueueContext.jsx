@@ -4,8 +4,8 @@ import { actions } from './queueLogic.js';
 import { api } from './api.js';
 import { useAuth } from './AuthContext.jsx';
 
-// Services and queues come from the API. Notification/history demo state and
-// local display preferences remain in browser storage until those modules ship.
+// Services, queues, notifications and history come from the API. Browser
+// storage only keeps local display preferences (such as the confetti flag).
 const STORAGE_KEY = 'queuesmart_demo_v3';
 
 const QueueContext = createContext(null);
@@ -86,7 +86,9 @@ export function QueueProvider({ children }) {
   async function refreshQueues() {
     const version = ++requestVersion.current;
     const owner = user?.id;
-    const [{ services }, snapshot] = await Promise.all([api('/services'), api('/queues')]);
+    const [{ services }, snapshot, { notifications }, { history }] = await Promise.all([
+      api('/services'), api('/queues'), api('/notifications'), api('/history'),
+    ]);
     if (version !== requestVersion.current || owner !== account.current) return;
     const minutes = value => { const date = new Date(value); return date.getHours() * 60 + date.getMinutes(); };
     const ticketId = entry => entry.ticketId;
@@ -104,7 +106,20 @@ export function QueueProvider({ children }) {
         servedAt: entry.servedAt ? minutes(entry.servedAt) : null,
         celebrated: previous?.entryId === entry.id ? previous.celebrated : false };
     }
-    commit({ ...latest.current, services: services.map(displayService), queues, tickets });
+    const audience = user.role === 'ADMIN' ? 'admin' : user.email;
+    const updates = notifications.map(n => ({
+      n: n.id, t: minutes(n.createdAt), audience, kind: n.kind, title: n.title, body: n.message,
+      serviceId: n.serviceId ? String(n.serviceId) : undefined, ticketId: n.ticketId, notify: true,
+    }));
+    const read = { [audience]: notifications.filter(n => n.read).map(n => n.id) };
+    const day = value => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const historyRows = history.map(row => ({
+      entryId: row.id, email: row.email, visitorName: row.visitorName, date: day(row.endedAt), time: minutes(row.endedAt),
+      serviceId: String(row.serviceId), serviceName: row.serviceName, ticketId: row.ticketId,
+      outcome: user.role === 'ADMIN' && row.outcome ? row.outcome : row.result, problem: row.problem, notes: row.notes,
+    }));
+    commit({ ...latest.current, services: services.map(displayService), queues, tickets,
+      updates, read, cleared: {}, history: historyRows });
   }
 
   useEffect(() => {
@@ -187,6 +202,30 @@ export function QueueProvider({ children }) {
     return 'Visit completed';
   }
 
+  // Notification actions update the screen right away, then save to the server.
+  function markUpdateRead(audience, id) {
+    run('markUpdateRead')(audience, id);
+    api(`/notifications/${id}/read`, { method: 'PATCH' }).catch(() => refreshQueues().catch(() => {}));
+  }
+
+  function markAllUpdatesRead(audience) {
+    run('markAllUpdatesRead')(audience);
+    api('/notifications/read-all', { method: 'PATCH' }).catch(() => refreshQueues().catch(() => {}));
+  }
+
+  async function clearUpdates(audience) {
+    await api('/notifications', { method: 'DELETE' });
+    commit({ ...latest.current, updates: latest.current.updates.filter(u => u.audience !== audience) });
+    return 'Notifications cleared';
+  }
+
+  async function updateHistory(historyIndex, changes) {
+    const row = latest.current.history[historyIndex];
+    await api(`/history/${row.entryId}`, { method: 'PUT', body: changes });
+    await refreshQueues();
+    return 'Visit history updated';
+  }
+
   // Each action runs on a copy of the state and returns its toast message, if any.
   const run =
     (name) =>
@@ -207,10 +246,10 @@ export function QueueProvider({ children }) {
     toggleOpen,
     saveService,
     deleteService,
-    updateHistory: run('updateHistory'),
-    clearUpdates: run('clearUpdates'),
-    markUpdateRead: run('markUpdateRead'),
-    markAllUpdatesRead: run('markAllUpdatesRead'),
+    updateHistory,
+    clearUpdates,
+    markUpdateRead,
+    markAllUpdatesRead,
     dismissTicket: (email) => { dismissedTicket.current = latest.current.tickets[email]?.entryId; return run('dismissTicket')(email); },
     markCelebrated: run('markCelebrated'),
     resetDemo: () => {
