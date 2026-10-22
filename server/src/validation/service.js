@@ -12,6 +12,10 @@ export function validateService(body, partial = false) {
       if (typeof value !== 'string' || !value.trim()) {
         return { error: `${field} is required and must be text` };
       }
+      const limit = field === 'name' ? 100 : 500;
+      if (value.trim().length > limit) {
+        return { error: `${field} must be at most ${limit} characters` };
+      }
       data[field] = value.trim();
     } else if (field === 'expectedDuration') {
       if (!Number.isInteger(value) || value <= 0 || value > 2147483647) {

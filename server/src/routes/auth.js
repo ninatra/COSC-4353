@@ -1,12 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { Router } from 'express';
-import { ROLES } from '../constants.js';
 import { prisma } from '../db.js';
 import { requireAuth, signToken } from '../middleware/auth.js';
+import { validateLogin, validateRegistration } from '../validation/auth.js';
 
 const router = Router();
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Never send the password hash or verification token to the client.
 function publicUser(user) {
@@ -15,32 +14,10 @@ function publicUser(user) {
 }
 
 router.post('/register', async (req, res) => {
-  const { name, email, password, role = 'USER', adminCode } = req.body ?? {};
+  const { data, status, error } = validateRegistration(req.body, process.env.ADMIN_SIGNUP_CODE);
+  if (error) return res.status(status).json({ error });
+  const { name, email: normalizedEmail, password, role } = data;
 
-  if (
-    typeof name !== 'string' ||
-    typeof email !== 'string' ||
-    typeof password !== 'string' ||
-    !name.trim() ||
-    !email.trim() ||
-    !password.trim()
-  ) {
-    return res.status(400).json({ error: 'Name, email and password are required and must be text' });
-  }
-  if (!EMAIL_RE.test(email)) {
-    return res.status(400).json({ error: 'Email address is not valid' });
-  }
-  if (password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  }
-  if (!ROLES.includes(role)) {
-    return res.status(400).json({ error: 'Role must be USER or ADMIN' });
-  }
-  if (role === 'ADMIN' && adminCode !== process.env.ADMIN_SIGNUP_CODE) {
-    return res.status(403).json({ error: 'Invalid administrator code' });
-  }
-
-  const normalizedEmail = email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
   if (existing) {
     return res.status(409).json({ error: 'An account with this email already exists' });
@@ -48,7 +25,7 @@ router.post('/register', async (req, res) => {
 
   const user = await prisma.user.create({
     data: {
-      name: name.trim(),
+      name,
       email: normalizedEmail,
       passwordHash: await bcrypt.hash(password, 10),
       role,
@@ -65,18 +42,12 @@ router.post('/register', async (req, res) => {
 });
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body ?? {};
-  if (
-    typeof email !== 'string' ||
-    typeof password !== 'string' ||
-    !email.trim() ||
-    !password.trim()
-  ) {
-    return res.status(400).json({ error: 'Email and password are required and must be text' });
-  }
+  const { data, status, error } = validateLogin(req.body);
+  if (error) return res.status(status).json({ error });
+  const { email, password } = data;
 
   const user = await prisma.user.findUnique({
-    where: { email: email.trim().toLowerCase() },
+    where: { email },
   });
   // Same message for unknown email and wrong password so attackers can't
   // discover which emails are registered.

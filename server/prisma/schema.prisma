@@ -72,7 +72,12 @@ model QueueEntry {
 model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int
+  kind      String   @default("info") // confirmed | almost | served | left | joined | queue-active | capacity
+  title     String   @default("")
   message   String
+  serviceId Int?
+  ticketId  String?
+  entryId   Int? // queue entry the notice is about; prevents duplicate "almost ready" alerts
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 

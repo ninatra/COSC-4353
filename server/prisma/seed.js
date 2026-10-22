@@ -2,7 +2,8 @@
 // Safe to run more than once.
 import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
-import { formatTicketId, positionInQueue } from '../src/logic/queue.js';
+import { formatTicketId, orderQueue, positionInQueue } from '../src/logic/queue.js';
+import { almostReadyNotifications, joinNotifications } from '../src/logic/notifications.js';
 
 const prisma = new PrismaClient();
 
@@ -83,6 +84,7 @@ async function main() {
     'IT Help Desk': ['Olivia Nguyen', 'Ethan Brown', 'Ava Martinez'],
   };
   const resetQueues = process.argv.includes('--reset-queues');
+  const adminIds = (await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } })).map((u) => u.id);
   let added = 0;
   for (const [serviceName, names] of Object.entries(queuePlans)) {
     const service = await prisma.service.findFirst({ where: { name: serviceName }, orderBy: { id: 'asc' } });
@@ -109,10 +111,36 @@ async function main() {
         const entry = await db.queueEntry.create({ data: { userId: visitor.id, serviceId: service.id, priority: 'MEDIUM' } });
         const entries = await db.queueEntry.findMany({ where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } } });
         const { position } = positionInQueue(entries, entry.id, service.expectedDuration);
-        await db.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id), initialPosition: position } });
+        const joined = await db.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id), initialPosition: position } });
+        await db.notification.createMany({ data: joinNotifications({ entry: joined, service, position, waitingCount: entries.length, userId: visitor.id, adminIds }) });
         added++;
       }
+      const ordered = orderQueue(await db.queueEntry.findMany({ where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } } }));
+      const alerted = await db.notification.findMany({ where: { kind: 'almost', entryId: { in: ordered.map((e) => e.id) } }, select: { entryId: true } });
+      const almost = almostReadyNotifications(ordered, alerted.map((n) => n.entryId), service);
+      if (almost.length) await db.notification.createMany({ data: almost });
     });
+  }
+
+  // A few past visits so the demo user's History screen isn't empty.
+  const demoUser = await prisma.user.findUnique({ where: { email: 'user@queuesmart.dev' } });
+  if (!(await prisma.queueEntry.findFirst({ where: { userId: demoUser.id, status: 'SERVED' } }))) {
+    const past = [
+      ['IT Help Desk', 'SERVED', 6, { outcome: 'completed', problem: 'Wi-Fi login' }],
+      ['Financial Aid', 'LEFT', 3, {}],
+      ['Academic Advising', 'SERVED', 1, { outcome: 'follow-up', problem: 'Degree plan review' }],
+    ];
+    for (const [serviceName, status, daysAgo, details] of past) {
+      const service = await prisma.service.findFirst({ where: { name: serviceName } });
+      if (!service) continue;
+      const joinedAt = new Date(Date.now() - daysAgo * 86400000);
+      const endedAt = new Date(joinedAt.getTime() + 25 * 60000);
+      const entry = await prisma.queueEntry.create({ data: {
+        userId: demoUser.id, serviceId: service.id, status, joinedAt, completedAt: endedAt,
+        servedAt: status === 'SERVED' ? endedAt : null, ...details,
+      } });
+      await prisma.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id) } });
+    }
   }
 
   console.log(`Added ${added} demo visitors.`);

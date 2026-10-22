@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 import { parseServiceId } from '../validation/service.js';
 import { orderQueue, joinError, positionInQueue, validateCompletion, formatTicketId, validateReorder } from '../logic/queue.js';
+import { almostReadyNotifications, joinNotifications, leftNotification, servedNotification } from '../logic/notifications.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -10,6 +11,16 @@ const active = ['WAITING', 'SERVING'];
 // Select only public identity fields; password hashes and tokens never leave the server.
 const include = { user: { select: { name: true, email: true } }, service: true };
 const fail = (status, message) => Object.assign(new Error(message), { status });
+
+// Tells visitors who just reached the front of the line, once per visit.
+async function alertAlmostReady(db, service) {
+  const ordered = orderQueue(await db.queueEntry.findMany({ where: { serviceId: service.id, status: { in: active } } }));
+  const alerted = await db.notification.findMany({
+    where: { kind: 'almost', entryId: { in: ordered.map(entry => entry.id) } }, select: { entryId: true },
+  });
+  const data = almostReadyNotifications(ordered, alerted.map(n => n.entryId), service);
+  if (data.length) await db.notification.createMany({ data });
+}
 
 router.param('serviceId', (req, res, next, value) => {
   req.serviceId = parseServiceId(value);
@@ -27,9 +38,11 @@ router.get('/', async (req, res) => {
       ...(req.user.role === 'ADMIN' || entry.userId === req.user.id ? { user } : {}),
     });
   }
-  const mine = req.user.role === 'USER' ? await prisma.queueEntry.findFirst({
-    where: { userId: req.user.id }, orderBy: { id: 'desc' },
-  }) : null;
+  // The active ticket wins; otherwise show the most recently finished visit.
+  const mine = req.user.role === 'USER'
+    ? await prisma.queueEntry.findFirst({ where: { userId: req.user.id, status: { in: active } } })
+      ?? await prisma.queueEntry.findFirst({ where: { userId: req.user.id }, orderBy: [{ completedAt: 'desc' }, { id: 'desc' }] })
+    : null;
   res.json({ queues, ticket: mine && [...active, 'SERVED'].includes(mine.status) ? mine : null });
 });
 
@@ -59,32 +72,44 @@ router.post('/:serviceId/join', requireRole('USER'), async (req, res) => {
     const created = await db.queueEntry.create({ data: { userId: req.user.id, serviceId: service.id, priority: 'MEDIUM' } });
     const entries = await db.queueEntry.findMany({ where: { serviceId: service.id, status: { in: active } } });
     const { position } = positionInQueue(entries, created.id, service.expectedDuration);
-    return db.queueEntry.update({ where: { id: created.id }, data: {
+    const joined = await db.queueEntry.update({ where: { id: created.id }, data: {
       ticketId: formatTicketId(service.name, created.id), initialPosition: position,
     } });
+    const admins = await db.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+    await db.notification.createMany({ data: joinNotifications({
+      entry: joined, service, position, waitingCount: entries.length, userId: req.user.id, adminIds: admins.map(a => a.id),
+    }) });
+    await alertAlmostReady(db, service);
+    return joined;
   });
   res.status(201).json({ entry });
 });
 
 router.put('/:serviceId/reorder', requireRole('ADMIN'), async (req, res) => {
   await prisma.$transaction(async db => {
-    if (!(await db.service.findUnique({ where: { id: req.serviceId } }))) throw fail(404, 'Service not found');
+    const service = await db.service.findUnique({ where: { id: req.serviceId } });
+    if (!service) throw fail(404, 'Service not found');
     const current = orderQueue(await db.queueEntry.findMany({ where: { serviceId: req.serviceId, status: { in: active } } }));
     const error = validateReorder(req.body, current.map(entry => entry.id));
     if (error) throw fail(error.status, error.error);
     for (const [manualOrder, id] of req.body.entryIds.entries()) {
       await db.queueEntry.update({ where: { id }, data: { manualOrder } });
     }
+    await alertAlmostReady(db, service);
   });
   res.json({ message: 'Queue order updated' });
 });
 
 router.post('/:serviceId/leave', requireRole('USER'), async (req, res) => {
-  const result = await prisma.queueEntry.updateMany({
-    where: { userId: req.user.id, serviceId: req.serviceId, status: { in: active } },
-    data: { status: 'LEFT', completedAt: new Date() },
+  await prisma.$transaction(async db => {
+    const entry = await db.queueEntry.findFirst({
+      where: { userId: req.user.id, serviceId: req.serviceId, status: { in: active } }, include: { service: true },
+    });
+    if (!entry) throw fail(404, 'You are not in this queue');
+    await db.queueEntry.update({ where: { id: entry.id }, data: { status: 'LEFT', completedAt: new Date() } });
+    await db.notification.create({ data: leftNotification(entry, entry.service) });
+    await alertAlmostReady(db, entry.service);
   });
-  if (!result.count) return res.status(404).json({ error: 'You are not in this queue' });
   res.json({ message: 'You left the queue' });
 });
 
@@ -93,12 +118,16 @@ router.post('/:serviceId/serve-next', requireRole('ADMIN'), async (req, res) => 
   const { data, error } = validateCompletion(req.body);
   if (error) return res.status(400).json({ error });
   const entry = await prisma.$transaction(async db => {
-    if (!(await db.service.findUnique({ where: { id: req.serviceId } }))) throw fail(404, 'Service not found');
+    const service = await db.service.findUnique({ where: { id: req.serviceId } });
+    if (!service) throw fail(404, 'Service not found');
     const next = orderQueue(await db.queueEntry.findMany({ where: { serviceId: req.serviceId, status: { in: active } } }))[0];
     if (!next) throw fail(409, 'Nobody is waiting in this queue');
     if (req.body?.entryId !== undefined && req.body.entryId !== next.id) throw fail(409, 'The queue changed. Review the next visitor and try again.');
     const now = new Date();
-    return db.queueEntry.update({ where: { id: next.id }, data: { ...data, status: 'SERVED', servedAt: now, completedAt: now } });
+    const served = await db.queueEntry.update({ where: { id: next.id }, data: { ...data, status: 'SERVED', servedAt: now, completedAt: now } });
+    await db.notification.create({ data: servedNotification(served, service) });
+    await alertAlmostReady(db, service);
+    return served;
   });
   res.json({ entry });
 });
