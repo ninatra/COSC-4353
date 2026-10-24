@@ -11,7 +11,7 @@ import { useToast } from '../components/Toast.jsx';
 const UPDATE_STYLE = {
   'queue-active': ['user-plus', 'blue'], capacity: ['users', 'sun'],
   confirmed: ['ticket', 'blue'], joined: ['user-plus', 'blue'], position: ['arrow-up', 'blue'],
-  almost: ['bell-ring', 'sun'], served: ['circle-check', 'mint'], left: ['log-out', 'peach'],
+  next: ['bell-ring', 'sun'], almost: ['bell-ring', 'sun'], served: ['circle-check', 'mint'], left: ['log-out', 'peach'],
   removed: ['user-minus', 'peach'], closed: ['lock', 'peach'], opened: ['lock-open', 'mint'],
   edit: ['pencil', 'lilac'], created: ['plus', 'lilac'], wait: ['clock', 'sun'], reorder: ['list-ordered', 'lilac'],
 };

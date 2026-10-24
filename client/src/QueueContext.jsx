@@ -87,7 +87,7 @@ export function QueueProvider({ children }) {
     const version = ++requestVersion.current;
     const owner = user?.id;
     const [{ services }, snapshot, { notifications }, { history }] = await Promise.all([
-      api('/services'), api('/queues'), api('/notifications'), api('/history'),
+      api('/services'), api('/queues'), api('/notifications'), user.role === 'ADMIN' ? Promise.resolve({ history: [] }) : api('/history'),
     ]);
     if (version !== requestVersion.current || owner !== account.current) return;
     const minutes = value => { const date = new Date(value); return date.getHours() * 60 + date.getMinutes(); };
@@ -196,6 +196,12 @@ export function QueueProvider({ children }) {
     return 'Queue order updated';
   }
 
+  async function removeVisitor(serviceId, entryId, notes = '') {
+    await api(`/queues/${serviceId}/entries/${entryId}`, { method: 'DELETE', body: { notes } });
+    await refreshQueues();
+    return 'Visitor removed from queue';
+  }
+
   async function serveNext(serviceId, completion, entryId) {
     await api(`/queues/${serviceId}/serve-next`, { method: 'POST', body: { ...completion, entryId } });
     await refreshQueues();
@@ -243,6 +249,7 @@ export function QueueProvider({ children }) {
     leave,
     serveNext,
     reorderQueue,
+    removeVisitor,
     toggleOpen,
     saveService,
     deleteService,

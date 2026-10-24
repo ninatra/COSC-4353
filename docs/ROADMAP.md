@@ -1,88 +1,74 @@
 # QueueSmart Build Roadmap
 
-Each step is a feature that can be built, demoed and merged on its own. The
-database tables for every step already exist in `server/prisma/schema.prisma`.
+## Implemented
 
-## Done
+- React/Vite frontend, Express API, and SQLite through Prisma.
+- Registration/login with password hashing, JWT sessions, user/admin roles, and validation.
+- Email verification links printed in the server console (no email delivery).
+- Service creation, editing, listing, opening/closing, and deletion through the API, including service metadata.
+- User queue join/leave and admin waiting lists, serve-next, drag-and-drop/arrow reordering, and removal with optional notes/reason.
+- Basic wait estimates: people ahead × expected visit duration.
+- Backend notifications and history connected to the frontend.
+- Unit tests for business rules/validation and API tests using isolated test databases.
 
-- [x] Project setup (React client, Express API, SQLite database via Prisma)
-- [x] Register and log in with email and password
-- [x] User and Administrator roles, with role-protected pages and API routes
-- [x] Email verification (design only: the link is printed in the server console)
+## Service management
 
-## A2: Front end with mock data
+Routes in `server/src/routes/services.js`:
 
-The A2 screens follow the design prototype and run entirely in the browser on demo
-data. Login still uses the real API.
+- `GET /api/services`: catalog for logged-in users.
+- `POST /api/services`, `PUT /api/services/:id`, `DELETE /api/services/:id`: admin only.
+- Service fields include name, description, expected duration, priority, open/closed state, location, contact, hours, category, capacity, and instructions.
+- Category determines the displayed service icon. Services with queue history cannot be deleted.
 
-- `client/src/mockData.js`: seed data (services, queues, Hao's ticket IT-024, history, updates)
-- `client/src/queueLogic.js`: queue rules and the simulation, with a simulated clock
-- `client/src/QueueContext.jsx`: one shared store (`useQueues()`), saved in localStorage and synced across tabs
+## Queue management
 
-Done:
+Routes in `server/src/routes/queues.js`:
 
-- [x] Sign in / Create account with inline validation
-- [x] App shell: header, nav, phone tab bar, footer with Reset demo, light/dark theme
-- [x] User: Overview (ticket + "While you wait" timeline + services), Services, service detail/join, My ticket (leave, served + confetti)
-- [x] Admin: Overview (open/close queues, priority sorting, open/closed sections), Waiting lists (serve next, reorder, remove)
-- [x] Confirmation dialogs, toasts, empty states
-- [x] Admin service management (service list, create/edit form, metadata, open/close, delete)
-- [x] Admin visit completion (problem, outcome, notes) and service-grouped visit history
-- [x] In-app notifications with unread badges, mark-read, and clear-history controls
-- [x] Waiting-list drag-and-drop reordering with arrow-button fallback
+- `POST /api/queues/:serviceId/join`, `POST /api/queues/:serviceId/leave`: user actions.
+- `GET /api/queues`: shared queue snapshot; other visitors’ identities are hidden from non-admins.
+- `GET /api/queues/me`: active ticket, position, and estimated wait.
+- `GET /api/queues/:serviceId`: admin waiting list.
+- `POST /api/queues/:serviceId/serve-next`: admin completes the next visit with an outcome and optional issue/notes.
+- `PUT /api/queues/:serviceId/reorder`: admin saves manual queue order; stale requests are rejected.
+- `DELETE /api/queues/:serviceId/entries/:entryId`: admin removes a visitor with optional notes/reason. History records the result as Removed.
 
-Services and queues now use the backend. History and notification screens still use browser-local demo data.
+Manual order takes precedence over ticket priority, then arrival time. Standard joins receive MEDIUM priority. New visitors append after manually ordered visitors. Service priority is a separate admin sorting label. Users can hold only one active place, and cannot join closed/full queues.
 
-## 1. Service management (admin)
+Screens refresh after actions and poll every 10 seconds. Tickets use stored service-prefixed IDs such as AA-002 and IT-003.
 
-API: `server/src/routes/services.js`, mounted at `/api/services`
+## Notifications
 
-Backend implemented: authenticated catalog listing for both roles (including closed services), admin-only creation and partial updates including open/close, input
-validation, and direct unit tests for validation and service IDs. Frontend service listing, creation, editing, open/close, and deletion now use the API. Overall backend coverage remains to be assessed
-as tests for authentication, route handlers, and queue logic are added.
+Rules in `server/src/logic/notifications.js`, saved by queue routes:
 
-- `GET /api/services` for any logged-in user, listing the service catalog
-- `POST /api/services` for admins only, creating a service (name, description, expectedDuration, priority)
-- `PUT /api/services/:id` for admins only, editing a service or opening/closing it
-- Protect admin routes with `requireAuth, requireRole('ADMIN')` from `middleware/auth.js`
+- Users: Ticket confirmed on joining, Almost ready at position 2, You’re next at position 1, and served/left/removed notices.
+- Almost ready and You’re next are separate alerts, each sent once per visit.
+- Admin bell: first visitor in an empty queue and queue reaching capacity. Routine joins appear on the Notifications page without increasing the bell count.
+- Admin actions show confirmation toasts. No email/SMS delivery.
+- `GET /api/notifications`, `PATCH /api/notifications/:id/read`, `PATCH /api/notifications/read-all`, `DELETE /api/notifications`.
 
-Client demo: a service list plus a responsive create/edit form on the Admin dashboard. The form validates required fields, numeric values, and text lengths; category automatically chooses the service icon.
+## History
 
-## 2. Queue management
+Routes in `server/src/routes/history.js`:
 
-API: `server/src/routes/queues.js`
+- `GET /api/history`: finished visits, scoped to the user or all visits for admins.
+- Admin history uses backend filters and pagination: service, date range (Today by default), status, student/ticket search, and 15 visits per page.
+- The table includes issue, outcome, and notes. Blank issues/notes display a dash.
+- `PUT /api/history/:id`: admin edits served visit issues/outcomes/notes; left/removed visits allow notes-only editing with the result preserved.
+- Sample past visits have varied dates and outcomes. Queue resets preserve prior entries as Left, so reset-generated records also appear in history.
 
-- `POST /api/queues/:serviceId/join` creates a `WAITING` entry. Reject closed/full services or any existing active entry for that user.
-- `POST /api/queues/:serviceId/leave` sets the status to `LEFT` and stamps `completedAt`.
-- `GET /api/queues` returns queue snapshots with other users' identities hidden from non-admins.
-- `GET /api/queues/me` returns the user's active entry with position and estimated wait.
-- `GET /api/queues/:serviceId` (admin) returns the ordered list of waiting users.
-- `POST /api/queues/:serviceId/serve-next` (admin) completes the next visitor as `SERVED`, storing optional problem/notes and the outcome.
+## Styling and demo data
 
-**Ordering rule:** sort by priority (HIGH, then MEDIUM, then LOW), then by `joinedAt`, oldest first.
+- `client/src/index.css` imports four files in `client/src/styles/`: `foundation.css`, `pages.css`, `forms.css`, and `responsive.css`.
+- Light/dark themes, responsive layouts, confirmation dialogs, toasts, and empty states are implemented.
+- `server/prisma/seed.js` provides demo accounts, services, queue visitors, and history. Normal seeding avoids duplicating sample records.
+- Explicit queue restoration: from `server/`, run `node --env-file=.env prisma/seed.js --reset-queues`. The old browser-only Reset demo footer has been removed.
 
-**Estimated wait:** people ahead × `service.expectedDuration`. A later improvement is to use the average of real service times (`completedAt - servedAt`) from recent `SERVED` entries.
+## Remaining / optional
 
-Implemented: API-backed join/leave, admin queue viewing and completion, transactional writes, queue-rule unit tests, and polling every 10 seconds. Standard joins use MEDIUM priority; users cannot choose their own priority. Admin reordering is saved through `PUT /api/queues/:serviceId/reorder`; manual order takes precedence and new visitors append. Drag-and-drop and arrow controls are available. Visitor removal remains pending.
-
-## 3. Notifications
-
-Done. Rules in `server/src/logic/notifications.js`, saved as `Notification` rows by the queue routes:
-
-- Joining: the visitor gets "Ticket confirmed" (position and wait); admins get "Visitor joined", plus "First visitor waiting" and "Queue at capacity" when they apply.
-- Reaching position 1 or 2 (after a join, leave, serve or reorder): one "Almost ready" notice per visit.
-- Served and left: a notice to the visitor.
-- `GET /api/notifications`, `PATCH /api/notifications/:id/read`, `PATCH /api/notifications/read-all`, `DELETE /api/notifications`
-- The bell, Notifications page and "While you wait" read from this API. In-app only; nothing is emailed.
-- Optional later: send a real email too (Nodemailer + Mailtrap for testing).
-
-## 4. History and statistics
-
-- Done: `GET /api/history` returns finished visits (served, left, removed): the user's own, or every visit for admins. `PUT /api/history/:id` (admin) edits a served visit's outcome, problem and notes. Rows are built in `server/src/logic/history.js`.
-- Still to do: `GET /api/stats` (admin) returns, per service: people served today, average wait (`servedAt - joinedAt`), the busiest hours, and the number of people who left.
-- Users see personal history; admins see visit history grouped by service, with edit controls. Both come from the API.
+- Admin statistics endpoint and charts.
+- Optional email delivery.
+- Review coverage reports for the assignment’s overall target; do not infer whole-backend coverage from a subset of loaded modules.
 
 ## Team workflow
 
-- Create one GitHub issue per feature above and put them on a GitHub Projects board.
-- Work on a branch per feature and open a pull request. Get one review before merging to `main`.
+Create feature issues, work on branches, and request a review before merging to main.

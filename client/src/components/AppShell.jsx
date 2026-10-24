@@ -5,9 +5,7 @@ import { fillService, isWaiting, notificationsFor } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
 import { useTheme } from '../useTheme.js';
 import { firstName, fmtTime, initials } from '../utils/format.js';
-import { useConfirm } from './ConfirmDialog.jsx';
 import Icon from './Icon.jsx';
-import { useToast } from './Toast.jsx';
 
 // [path, label, icon, short label for the phone tab bar, match exactly]
 const USER_NAV = [
@@ -198,9 +196,7 @@ function AccountMenu({ user, isAdmin, onSignOut }) {
 
 export default function AppShell({ children }) {
   const { user, logout } = useAuth();
-  const { state, resetDemo, markUpdateRead } = useQueues();
-  const confirm = useConfirm();
-  const toast = useToast();
+  const { state, markUpdateRead } = useQueues();
   useFocusHeadingOnNavigate();
 
   const isAdmin = user.role === 'ADMIN';
@@ -213,19 +209,6 @@ export default function AppShell({ children }) {
         <span className="sr-only"> (1 active)</span>
       </>
     ) : null;
-
-  async function handleReset() {
-    const ok = await confirm({
-      title: 'Reset the demo?',
-      body: 'This resets local demo history and notifications. Server services, queues, and tickets are kept.',
-      confirmLabel: 'Reset demo',
-      danger: true,
-    });
-    if (ok) {
-      resetDemo();
-      toast('Demo reset');
-    }
-  }
 
   return (
     <>
@@ -263,16 +246,6 @@ export default function AppShell({ children }) {
         {children}
       </main>
 
-      <footer className="site-footer">
-        <div className="wrap">
-          <span>
-            Demo build · sample data and a simulated clock (now {fmtTime(state.clock)}). Saved only in this browser.
-          </span>
-          <button type="button" className="btn-text" onClick={handleReset}>
-            Reset demo
-          </button>
-        </div>
-      </footer>
 
       <nav className="tabbar" aria-label="Main">
         {nav.map(([path, , icon, short, end]) => (

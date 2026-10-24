@@ -12,10 +12,14 @@ import { formatWait, fmtTime, hashTint, initials, pad, people } from '../utils/f
 
 export default function WaitingLists() {
   const { serviceId } = useParams();
-  const { state, serveNext, reorderQueue } = useQueues();
+  const { state, serveNext, reorderQueue, removeVisitor } = useQueues();
   const navigate = useNavigate();
   const toast = useToast();
   const [servingVisitor, setServingVisitor] = useState(null);
+  const [removingVisitor, setRemovingVisitor] = useState(null);
+  const [removalNotes, setRemovalNotes] = useState('');
+  const removalDialogRef = useRef(null);
+  useEffect(() => { if (removingVisitor) removalDialogRef.current?.showModal(); }, [removingVisitor]);
   const [completion, setCompletion] = useState({ outcome: 'completed', problem: '', notes: '' });
   const serveDialogRef = useRef(null);
   const [saving, setSaving] = useState(false);
@@ -55,6 +59,26 @@ export default function WaitingLists() {
     setSaving(true);
     try { toast(await reorderQueue(service.id, ids, previousIds)); }
     catch (error) { toast(error.message); }
+    finally { setSaving(false); }
+  }
+
+  function handleRemove(visitor) {
+    setRemovalNotes('');
+    setRemovingVisitor(visitor);
+  }
+  function closeRemoval() {
+    if (saving) return;
+    removalDialogRef.current?.close();
+    setRemovingVisitor(null);
+  }
+  async function submitRemoval(event) {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      toast(await removeVisitor(service.id, removingVisitor.entryId, removalNotes));
+      removalDialogRef.current?.close();
+      setRemovingVisitor(null);
+    } catch (error) { toast(error.message); }
     finally { setSaving(false); }
   }
 
@@ -111,12 +135,27 @@ export default function WaitingLists() {
         </button>
       </div>
 
+      <dialog ref={removalDialogRef} onCancel={event => { event.preventDefault(); closeRemoval(); }}>
+        {removingVisitor && <form className="dlg-inner serve-form" onSubmit={submitRemoval}>
+          <h2>Remove student</h2>
+          <p>{removingVisitor.name} · <span className="mono">{removingVisitor.id}</span></p>
+          <p>{service.name}</p>
+          <label htmlFor="removal-notes">Notes / reason (optional)</label>
+          <textarea id="removal-notes" maxLength={500} value={removalNotes} onChange={event => setRemovalNotes(event.target.value)} placeholder="Add the reason for removal or any relevant details" />
+          <p className="muted">This releases the student's place. They can join the queue again.</p>
+          <div className="dlg-actions">
+            <button type="button" className="btn btn-secondary" disabled={saving} onClick={closeRemoval}>Cancel</button>
+            <button type="submit" className="btn btn-danger" disabled={saving}>Remove student</button>
+          </div>
+        </form>}
+      </dialog>
+
       <dialog ref={serveDialogRef} onCancel={handleServeCancel}>
         {servingVisitor && (
           <form className="dlg-inner serve-form" onSubmit={handleServeSubmit}>
             <h2>Complete visit</h2>
             <p>{servingVisitor.name} · <span className="mono">{servingVisitor.id}</span></p>
-            <label htmlFor="visit-problem">Problem (optional)</label>
+            <label htmlFor="visit-problem">Issue (optional)</label>
             <textarea
               id="visit-problem"
               maxLength={500}
@@ -133,7 +172,7 @@ export default function WaitingLists() {
               <option value="completed">Completed</option>
               <option value="referred">Referred elsewhere</option>
               <option value="unresolved">Unresolved</option>
-              <option value="follow-up">Follow-up needed</option>
+              <option value="follow-up">Follow-up</option>
             </select>
             <label htmlFor="visit-notes">Notes <span className="muted">(optional)</span></label>
             <textarea
@@ -158,7 +197,7 @@ export default function WaitingLists() {
             <li
               key={v.id}
               className={`qrow ${i === 0 ? 'is-next' : ''} ${dragged === v.entryId ? 'is-dragging' : ''} ${dropTarget === v.entryId ? 'is-drop-target' : ''}`}
-              draggable={!saving && !servingVisitor}
+              draggable={!saving && !servingVisitor && !removingVisitor}
               onDragStart={(event) => {
                 if (event.target.closest('button')) { event.preventDefault(); return; }
                 event.dataTransfer.effectAllowed = 'move';
@@ -195,8 +234,9 @@ export default function WaitingLists() {
                 </div>
               </div>
               <div className="qactions">
-                <button type="button" className="icon-btn" aria-label={`Move ${v.name} up`} disabled={saving || Boolean(servingVisitor) || i === 0} onClick={() => moveVisitor(v.entryId, i - 1)}><Icon name="chevron-up" /></button>
-                <button type="button" className="icon-btn" aria-label={`Move ${v.name} down`} disabled={saving || Boolean(servingVisitor) || i === line.length - 1} onClick={() => moveVisitor(v.entryId, i + 1)}><Icon name="chevron-down" /></button>
+                <button type="button" className="icon-btn" aria-label={`Move ${v.name} up`} disabled={saving || (Boolean(servingVisitor) || Boolean(removingVisitor)) || i === 0} onClick={() => moveVisitor(v.entryId, i - 1)}><Icon name="chevron-up" /></button>
+                <button type="button" className="icon-btn" aria-label={`Move ${v.name} down`} disabled={saving || (Boolean(servingVisitor) || Boolean(removingVisitor)) || i === line.length - 1} onClick={() => moveVisitor(v.entryId, i + 1)}><Icon name="chevron-down" /></button>
+                <button type="button" className="icon-btn danger" aria-label={`Remove ${v.name} from queue`} title="Remove student" disabled={saving || (Boolean(servingVisitor) || Boolean(removingVisitor))} onClick={() => handleRemove(v)}><Icon name="x" /></button>
               </div>
             </li>
           ))}

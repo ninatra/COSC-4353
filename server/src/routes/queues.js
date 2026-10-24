@@ -16,9 +16,9 @@ const fail = (status, message) => Object.assign(new Error(message), { status });
 async function alertAlmostReady(db, service) {
   const ordered = orderQueue(await db.queueEntry.findMany({ where: { serviceId: service.id, status: { in: active } } }));
   const alerted = await db.notification.findMany({
-    where: { kind: 'almost', entryId: { in: ordered.map(entry => entry.id) } }, select: { entryId: true },
+    where: { kind: { in: ['almost', 'next'] }, entryId: { in: ordered.map(entry => entry.id) } }, select: { entryId: true, kind: true },
   });
-  const data = almostReadyNotifications(ordered, alerted.map(n => n.entryId), service);
+  const data = almostReadyNotifications(ordered, alerted.filter(n => n.kind === 'almost').map(n => n.entryId), service, alerted.filter(n => n.kind === 'next').map(n => n.entryId));
   if (data.length) await db.notification.createMany({ data });
 }
 
@@ -98,6 +98,28 @@ router.put('/:serviceId/reorder', requireRole('ADMIN'), async (req, res) => {
     await alertAlmostReady(db, service);
   });
   res.json({ message: 'Queue order updated' });
+});
+
+router.delete('/:serviceId/entries/:entryId', requireRole('ADMIN'), async (req, res) => {
+  const entryId = parseServiceId(req.params.entryId);
+  if (entryId === null) return res.status(400).json({ error: 'Queue entry ID must be a positive integer' });
+  const notes = req.body?.notes ?? '';
+  const { error } = validateCompletion({ notes });
+  if (error) return res.status(400).json({ error });
+  await prisma.$transaction(async db => {
+    const entry = await db.queueEntry.findFirst({
+      where: { id: entryId, serviceId: req.serviceId, status: { in: active } }, include: { service: true },
+    });
+    if (!entry) throw fail(404, 'This visitor is no longer in this queue');
+    await db.queueEntry.update({ where: { id: entry.id }, data: { status: 'NO_SHOW', notes: notes.trim(), completedAt: new Date() } });
+    await db.notification.create({ data: {
+      userId: entry.userId, kind: 'removed', title: 'Removed from queue',
+      serviceId: entry.serviceId, ticketId: entry.ticketId, entryId: entry.id,
+      message: `Your ticket ${entry.ticketId} was removed from ${entry.service.name} by an administrator. You can join again if you still need service.`,
+    } });
+    await alertAlmostReady(db, entry.service);
+  });
+  res.json({ message: 'Visitor removed from queue' });
 });
 
 router.post('/:serviceId/leave', requireRole('USER'), async (req, res) => {

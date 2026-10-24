@@ -7,7 +7,7 @@ const STATUS = {
   completed: ['Completed', 'ok'],
   referred: ['Referred', 'wait'],
   unresolved: ['Unresolved', 'bad'],
-  'follow-up': ['Follow-up needed', 'almost'],
+  'follow-up': ['Follow-up', 'almost'],
   left: ['Left queue', 'off'],
   removed: ['Removed', 'bad'],
 };

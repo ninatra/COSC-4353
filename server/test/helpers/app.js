@@ -1,7 +1,7 @@
 // Starts the API on a random port with its own empty test database, so route
 // tests never touch the demo data in dev.db.
 import { execSync } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const serverDir = fileURLToPath(new URL('../..', import.meta.url));
@@ -15,6 +15,8 @@ export async function startApp(name) {
   });
   // Start from a fresh file each run (it lives next to the schema and is git-ignored).
   for (const suffix of ['', '-journal']) rmSync(`${serverDir}prisma/test-${name}.db${suffix}`, { force: true });
+  // Ensure SQLite has a file before Prisma applies the schema.
+  writeFileSync(`${serverDir}prisma/test-${name}.db`, '');
   execSync('npx prisma db push --skip-generate', { cwd: serverDir, env: process.env, stdio: 'ignore' });
 
   // Hide the "verification link" lines that registration prints.

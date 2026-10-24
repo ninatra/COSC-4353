@@ -1,0 +1,47 @@
+/* Forms styles. */
+.form-panel { width: 100%; max-width: none; margin-top: 24px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+.form-wide { grid-column: 1 / -1; }
+.form-note { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+.form-alert { margin-bottom: 16px; }
+.field { display: grid; gap: 6px; margin-bottom: 20px; }
+.field label, .field legend { font-weight: 700; font-size: 15px; padding: 0; }
+.hint { font-size: 13px; color: var(--muted); }
+.field input:not([type]), .field input[type='text'], .field input[type='email'], .field input[type='password'], .field input[type='number'], .field textarea {
+  width: 100%; min-height: 48px; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font: inherit; font-size: 16px; transition: border-color .15s;
+}
+.field select { width: 100%; min-height: 48px; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font: inherit; font-size: 16px; }
+.field select:hover { border-color: var(--border-strong); }
+.field select:focus-visible { outline: none; border-color: var(--ticket); box-shadow: 0 0 0 4px var(--ring); }
+.field input:hover, .field textarea:hover { border-color: var(--border-strong); }
+.field textarea { min-height: 96px; resize: vertical; }
+.field input:focus-visible, .field textarea:focus-visible { outline: none; border-color: var(--ticket); box-shadow: 0 0 0 4px var(--ring); }
+.field.has-error input, .field.has-error textarea, .field.has-error select { border-color: var(--bad); }
+.error { display: flex; gap: 6px; align-items: flex-start; color: var(--bad); font-size: 14px; font-weight: 600; }
+.error .lucide { width: 16px; height: 16px; flex: none; margin-top: 2px; }
+.label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.counter { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.counter.over { color: var(--bad); font-weight: 700; }
+.suffix { display: flex; align-items: center; gap: 10px; }
+.suffix input { max-width: 140px; }
+.suffix span { color: var(--muted); }
+fieldset.field { border: 0; margin: 0 0 20px; padding: 0; min-width: 0; }
+.radio-seg { display: inline-flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.radio-seg label { position: relative; font-weight: 600; cursor: pointer; }
+.radio-seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.radio-seg span { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--panel); }
+.radio-seg span::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--pc, var(--border-strong)); }
+.radio-seg input:checked + span { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+.radio-seg input:checked + span::before { background: var(--pc, var(--ticket)); }
+.radio-seg input:focus-visible + span { outline: 2px solid var(--link); outline-offset: 2px; }
+.check { display: flex; gap: 10px; align-items: center; font-weight: 600; min-height: 44px; cursor: pointer; }
+.check input { width: 20px; height: 20px; accent-color: var(--ticket); }
+.form-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.service-instructions { padding: 12px 14px; border-left: 3px solid var(--ticket); background: var(--t-blue-bg); color: var(--text) !important; }
+.service-instructions p { margin: 4px 0 0; color: inherit; }
+.priority.priority-low { color: var(--t-mint-ink); font-weight: 700; }
+.priority.priority-medium { color: var(--t-sun-ink); font-weight: 700; }
+.priority.priority-high { color: var(--t-peach-ink); font-weight: 700; }
+@media (forced-colors: active) {
+  .field select, .serve-form select, .history-filters select { appearance: auto; background-image: none; }
+}

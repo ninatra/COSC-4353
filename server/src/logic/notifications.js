@@ -31,14 +31,15 @@ export function joinNotifications({ entry, service, position, waitingCount, user
 
 // "Almost ready" notices for visitors who just reached the front of an
 // ordered queue and haven't been told yet.
-export function almostReadyNotifications(ordered, alertedEntryIds, service) {
+export function almostReadyNotifications(ordered, alertedEntryIds, service, nextAlertedEntryIds = []) {
   const alerted = new Set(alertedEntryIds);
+  const nextAlerted = new Set(nextAlertedEntryIds);
   return ordered.slice(0, ALMOST_READY_POSITION)
-    .filter((entry) => entry.status === 'WAITING' && !alerted.has(entry.id))
+    .filter((entry, index) => entry.status === 'WAITING' && !(index === 0 ? nextAlerted : alerted).has(entry.id))
     .map((entry) => {
       const position = ordered.indexOf(entry) + 1;
       return {
-        userId: entry.userId, kind: 'almost', title: 'Almost ready',
+        userId: entry.userId, kind: position === 1 ? 'next' : 'almost', title: position === 1 ? "You're next" : 'Almost ready',
         serviceId: service.id, ticketId: entry.ticketId, entryId: entry.id,
         message: position === 1
           ? `You're next at ${service.name}. Please head to ${where(service)} now.`

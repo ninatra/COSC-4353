@@ -70,6 +70,19 @@ describe('history API', () => {
     assert.equal(res.body.visit.notes, 'Call back Friday');
   });
 
+  test('history filters and pagination run on the server and preserve ownership', async () => {
+    const query = `/history?paginated=true&serviceId=${serviceId}&status=SERVED&search=Hao&pageSize=10`;
+    const result = await app.request('GET', query, { token: admin.token });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.total, 1);
+    assert.equal(result.body.history.length, 1);
+    assert.equal(result.body.history[0].result, 'served');
+    assert.equal((await app.request('GET', `${query}&page=2`, { token: admin.token })).body.history.length, 0);
+    assert.equal((await app.request('GET', query, { token: other.token })).body.total, 0);
+    assert.equal((await app.request('GET', '/history?paginated=true&from=2000-01-01&to=2000-01-02', { token: admin.token })).body.total, 0);
+    assert.equal((await app.request('GET', '/history?paginated=true&pageSize=999', { token: admin.token })).status, 400);
+  });
+
   test('editing checks role, ID, input and visit status', async () => {
     const { history } = (await app.request('GET', '/history', { token: admin.token })).body;
     const served = history.find((r) => r.result === 'served');
@@ -79,6 +92,11 @@ describe('history API', () => {
     assert.equal((await app.request('PUT', `/history/${served.id}`, { token: admin.token, body: { outcome: 'lost' } })).status, 400);
     assert.equal((await app.request('PUT', `/history/${served.id}`, { token: admin.token, body: { notes: 'x'.repeat(501) } })).status, 400);
     assert.equal((await app.request('PUT', '/history/99999', { token: admin.token, body: {} })).status, 404);
-    assert.equal((await app.request('PUT', `/history/${left.id}`, { token: admin.token, body: {} })).status, 409);
+    const changed = await app.request('PUT', `/history/${left.id}`, { token: admin.token, body: { notes: 'Student called to cancel', outcome: 'completed', problem: 'Do not change' } });
+    assert.equal(changed.status, 200);
+    assert.equal(changed.body.visit.notes, 'Student called to cancel');
+    assert.equal(changed.body.visit.result, 'left');
+    assert.equal(changed.body.visit.outcome, null);
+    assert.equal(changed.body.visit.problem, left.problem);
   });
 });

@@ -14,8 +14,8 @@ QueueSmart also gives administrators the tools they need to organize their servi
 - Browse service details including location, hours, contact information, category, capacity, and instructions
 - Create, edit, open, close, and delete services as an administrator
 - Monitor active queues and reorder waiting visitors with buttons or drag and drop
-- Record visit problems, outcomes, and notes when serving a visitor
-- Review visit history organized by service
+- Record visit issues, outcomes, and notes when serving a visitor
+- Search and filter visit history by service, date, and status, with pagination
 - Organize and oversee service activity from one place
 
 ## How It Works
@@ -36,7 +36,7 @@ Users can browse available services, join a queue, and track their position and 
 
 ### Administrators
 
-Administrators can create and maintain services, manage active queues, monitor queue activity, and oversee the users waiting for service. They can open or close queues, reorder visitors, remove visitors, and complete visits with a problem description, outcome, and optional notes. Visit history is organized by service and can be edited after the visit.
+Administrators can create and maintain services, manage active queues, monitor queue activity, and oversee the users waiting for service. They can open or close queues, reorder visitors, remove visitors, and complete visits with an outcome and optional issue/notes. Admin history supports service and date filters, search, status filters, and pagination. Served visit details can be edited; left and removed visits allow notes-only edits.
 
 ## Getting Started
 
@@ -69,22 +69,23 @@ Email verification links are printed in the server console instead of being emai
 Useful commands:
 
 - `npm run db:studio -w server` opens a browser UI for viewing and editing the database.
-- To reset the database, delete `server/prisma/dev.db` and run `npm run setup`.
+- `cd server` then `node --env-file=.env prisma/seed.js --reset-queues` restores sample queues while preserving services, accounts, and history. Previous active entries become Left records.
+- Demo services, visitors, and past visits are defined in `server/prisma/seed.js`; restarting the app preserves database changes.
 
 ## Front End (A2)
 
-- **Stack:** React + Vite with plain CSS (design tokens in `client/src/index.css`, light and dark themes) and lucide-react icons. React gives us reusable components for the ticket, service cards and dialogs; Vite keeps development fast; plain CSS with custom properties keeps the design system in one place without a UI kit.
+- **Stack:** React + Vite with plain CSS (styles in `client/src/styles/`, imported by `client/src/index.css`, with light and dark themes) and lucide-react icons. React gives us reusable components for the ticket, service cards and dialogs; Vite keeps development fast; plain CSS with custom properties keeps the design system in one place without a UI kit.
 - **Backend integration:** services, queues, notifications and history all come from the API. Queue changes refresh immediately; other devices refresh every 10 seconds.
 - **Wait estimate:** people ahead × the service's expected visit length. This is a deliberate simplification for the demo.
-- **In-app notifications:** the bell and Notifications page display queue updates and status changes. Notifications are intentionally in-app only for this assignment; service configuration changes and queue reordering are not treated as alerts.
-- **Visit completion:** administrators complete the next visitor with an outcome and optional problem/notes. Standard joins follow arrival order; stored entry priority is considered first. Admins can reorder queues with drag-and-drop or arrow buttons. Visitor removal remains pending.
-- **Reset demo** resets local history/notification demo state and preserves server services and queues.
+- **In-app notifications:** users receive join confirmation, Almost ready at position 2, You’re next at position 1, and served/left/removed notices. Admin bell alerts cover first visitors and full queues; routine joins appear in activity history. No email/SMS is sent.
+- **Queue management:** admins complete visits with an outcome and optional issue/notes, reorder with drag-and-drop or arrows, and remove visitors with an optional reason. Manual order takes precedence over ticket priority and arrival time; new visitors append after manual reordering.
+- **History:** admins browse 15 visits per page, defaulting to Today, with service tabs, date range, status, and student/ticket search. All entries support editing; left/removed visits allow notes only.
 
 ## Back End (A3)
 
 - **Stack:** Node.js with Express 5 (REST API), Prisma with SQLite, bcryptjs for password hashing and JWT for login sessions. Tests use Node's built-in test runner.
 - **Modules:** authentication (`/api/auth`), service management (`/api/services`), queue management with wait-time estimates (`/api/queues`), notifications (`/api/notifications`) and history (`/api/history`). Business rules live in `server/src/logic/`; input validation lives in `server/src/validation/`.
-- **Tests:** `npm test -w server` runs unit tests for the rules and validation, plus route tests against a throwaway test database. `npm run test:coverage -w server` prints a coverage report for all server code.
+- **Tests:** `npm test -w server` runs unit tests for the rules and validation, plus route tests against a throwaway test database. `npm run test:coverage -w server` prints coverage for loaded server source modules; review included files before claiming overall coverage.
 
 ## Project Structure
 
@@ -92,6 +93,7 @@ Useful commands:
 client/   React web app (Vite)
   src/pages/        One file per screen (user and admin)
   src/components/   Shared UI: app shell, ticket, service cards, dialogs
+  src/styles/       Foundation, page, form, and responsive styles
   src/AuthContext   Keeps track of the logged-in user
   src/QueueContext  Shared API-backed service/queue state
 server/   Express REST API

@@ -108,7 +108,8 @@ async function main() {
         } else if (await db.queueEntry.findFirst({ where: { userId: visitor.id } })) continue;
         const waiting = await db.queueEntry.count({ where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } } });
         if (service.maxCapacity !== null && waiting >= service.maxCapacity) break;
-        const entry = await db.queueEntry.create({ data: { userId: visitor.id, serviceId: service.id, priority: 'MEDIUM' } });
+        const joinedAt = new Date(Date.now() - (names.length - slot) * 4 * 60000);
+        const entry = await db.queueEntry.create({ data: { userId: visitor.id, serviceId: service.id, priority: 'MEDIUM', joinedAt } });
         const entries = await db.queueEntry.findMany({ where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } } });
         const { position } = positionInQueue(entries, entry.id, service.expectedDuration);
         const joined = await db.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id), initialPosition: position } });
@@ -142,6 +143,60 @@ async function main() {
       await prisma.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id) } });
     }
   }
+
+  // Stable per-sample accounts keep history seeding repeatable without changing real visits.
+  const historySamples = [
+    { name: 'Avery Brooks', daysAgo: 0, status: 'SERVED', outcome: 'completed', notes: 'Request resolved during the visit.' },
+    { name: 'Riley Morgan', daysAgo: 0, status: 'SERVED', outcome: 'referred', notes: 'Referred to the specialist office for additional help.' },
+    { name: 'Casey Nguyen', daysAgo: 1, status: 'SERVED', outcome: 'follow-up', notes: 'Follow-up appointment requested for next week.' },
+    { name: 'Taylor Evans', daysAgo: 2, status: 'SERVED', outcome: 'unresolved', notes: 'Additional documents needed before the request can be resolved.' },
+    { name: 'Jamie Flores', daysAgo: 3, status: 'LEFT', notes: '' },
+    { name: 'Sam Reed', daysAgo: 5, status: 'NO_SHOW', notes: 'Visitor was unavailable when called.' },
+    { name: 'Alex Carter', daysAgo: 8, status: 'SERVED', outcome: 'completed', notes: 'Instructions provided and next steps confirmed.' },
+    { name: 'Drew Wilson', daysAgo: 12, status: 'SERVED', outcome: 'completed', notes: 'All questions answered.' },
+  ];
+  const problems = {
+    'Academic Advising': 'Course selection and degree requirements',
+    'Financial Aid': 'Scholarship eligibility and application documents',
+    'IT Help Desk': 'Account access and Wi-Fi connection',
+    'Student Services': 'Student ID and enrollment verification',
+  };
+  const historyVisitors = {
+    'Academic Advising': ['Avery Brooks', 'Riley Morgan', 'Casey Nguyen', 'Taylor Evans', 'Jamie Flores', 'Sam Reed', 'Alex Carter', 'Drew Wilson'],
+    'Financial Aid': ['Morgan Scott', 'Parker James', 'Quinn Lewis', 'Reese Allen', 'Cameron Hall', 'Skyler Young', 'Blake Adams', 'Emerson Hill'],
+    'IT Help Desk': ['Rowan Baker', 'Finley Green', 'Hayden King', 'River Wright', 'Dakota Lopez', 'Sage Turner', 'Elliot Torres', 'Charlie Ross'],
+    'Student Services': ['Sydney Ward', 'Payton Cook', 'Kendall Bell', 'Reagan Cruz', 'Harper Wood', 'Logan Price', 'Jules Perry', 'Robin Gray'],
+  };
+  let historyAdded = 0;
+  for (const service of await prisma.service.findMany({ where: { name: { in: Object.keys(problems) } } })) {
+    const keepOddSlots = ['Financial Aid', 'Student Services'].includes(service.name);
+    for (const [slot, sample] of historySamples.entries()) {
+      await prisma.$transaction(async db => {
+        const email = `demo-history-${service.id}-${slot + 1}@queuesmart.dev`;
+        if (slot % 2 !== (keepOddSlots ? 1 : 0)) {
+          // Trim only redundant generated history, preserving real visitors' records.
+          const redundant = await db.user.findUnique({ where: { email } });
+          if (redundant) await db.queueEntry.deleteMany({ where: { userId: redundant.id, serviceId: service.id, completedAt: { not: null } } });
+          return;
+        }
+        const name = historyVisitors[service.name][slot];
+        const visitor = await db.user.upsert({ where: { email }, update: { name },
+          create: { name, email, passwordHash, role: 'USER', emailVerified: true } });
+        if (await db.queueEntry.findFirst({ where: { userId: visitor.id, serviceId: service.id, completedAt: { not: null } } })) return;
+        const endedAt = new Date(Date.now() - sample.daysAgo * 86400000 - slot * 3 * 60000);
+        const servedAt = sample.status === 'SERVED' ? new Date(endedAt.getTime() - service.expectedDuration * 60000) : null;
+        const joinedAt = new Date((servedAt ?? endedAt).getTime() - (10 + slot * 5) * 60000);
+        const entry = await db.queueEntry.create({ data: {
+          userId: visitor.id, serviceId: service.id, status: sample.status,
+          priority: 'MEDIUM', joinedAt, servedAt, completedAt: endedAt,
+          outcome: sample.outcome ?? null, problem: sample.status === 'SERVED' ? problems[service.name] : '', notes: sample.status === 'LEFT' ? '' : sample.notes,
+        } });
+        await db.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id) } });
+        historyAdded++;
+      });
+    }
+  }
+  console.log(`Added ${historyAdded} sample history visits across today and previous days.`);
 
   console.log(`Added ${added} demo visitors.`);
   console.log('Seeded demo data. Log in with admin@queuesmart.dev or user@queuesmart.dev / password123');

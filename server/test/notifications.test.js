@@ -39,8 +39,17 @@ describe('notification rules', () => {
     assert.match(notices[0].message, /You're next/);
     assert.match(notices[1].message, /One person is ahead/);
     assert.match(notices[0].message, /Room 112/);
-    assert.deepEqual(almostReadyNotifications(ordered, [10], service).map((n) => n.entryId), [11]);
-    assert.deepEqual(almostReadyNotifications(ordered, [10, 11], service), []);
+    assert.deepEqual(almostReadyNotifications(ordered, [], service, [10]).map((n) => n.entryId), [11]);
+    assert.deepEqual(almostReadyNotifications(ordered, [11], service, [10]), []);
+  });
+
+  test('a position-two notice does not prevent the separate position-one notice', () => {
+    const entry = { id: 12, userId: 12, status: 'WAITING' };
+    const notices = almostReadyNotifications([entry], [12], service);
+    assert.equal(notices.length, 1);
+    assert.equal(notices[0].kind, 'next');
+    assert.equal(notices[0].title, "You're next");
+    assert.deepEqual(almostReadyNotifications([entry], [12], service, [12]), []);
   });
 
   test('someone already being served is not told they are almost ready', () => {
@@ -72,7 +81,7 @@ describe('notifications API', () => {
   test('joining creates a confirmation, and the front two are almost ready', async () => {
     const first = await app.account();
     assert.equal((await app.request('POST', `/queues/${serviceId}/join`, { token: first.token })).status, 201);
-    assert.deepEqual((await kinds(first.token)).sort(), ['almost', 'confirmed']);
+    assert.deepEqual((await kinds(first.token)).sort(), ['confirmed', 'next']);
     assert.ok((await kinds(admin.token)).includes('queue-active'));
   });
 

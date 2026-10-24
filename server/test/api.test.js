@@ -118,6 +118,30 @@ describe('queues API', () => {
     assert.equal((await app.request('POST', `/queues/${closed.id}/leave`, { token: alice.token })).status, 404);
   });
 
+  test('admins remove visitors while preserving history and notifying the student', async () => {
+    const { id } = (await create()).body.service;
+    const entry = (await app.request('POST', `/queues/${id}/join`, { token: alice.token })).body.entry;
+    await app.request('POST', `/queues/${id}/join`, { token: bob.token });
+    const path = `/queues/${id}/entries/${entry.id}`;
+    assert.equal((await app.request('DELETE', path)).status, 401);
+    assert.equal((await app.request('DELETE', path, { token: bob.token })).status, 403);
+    assert.equal((await app.request('DELETE', `/queues/${id}/entries/abc`, { token: admin.token })).status, 400);
+    assert.equal((await app.request('DELETE', `/queues/99999/entries/${entry.id}`, { token: admin.token })).status, 404);
+    assert.equal((await app.request('DELETE', path, { token: admin.token, body: { notes: 123 } })).status, 400);
+    assert.equal((await app.request('DELETE', path, { token: admin.token, body: { notes: 'x'.repeat(501) } })).status, 400);
+    assert.equal((await app.request('DELETE', path, { token: admin.token, body: { notes: ' Student unavailable when called ' } })).status, 200);
+    assert.equal((await app.request('DELETE', path, { token: admin.token })).status, 404);
+    const saved = await app.prisma.queueEntry.findUnique({ where: { id: entry.id } });
+    assert.equal(saved.status, 'NO_SHOW');
+    assert.equal(saved.notes, 'Student unavailable when called');
+    assert.ok(saved.completedAt);
+    assert.ok(await app.prisma.notification.findFirst({ where: { userId: alice.user.id, entryId: entry.id, kind: 'removed' } }));
+    assert.equal((await app.request('GET', '/queues/me', { token: bob.token })).body.ticket.position, 1);
+    assert.equal((await app.request('POST', `/queues/${id}/join`, { token: alice.token })).status, 201);
+    await app.request('POST', `/queues/${id}/leave`, { token: alice.token });
+    await app.request('POST', `/queues/${id}/leave`, { token: bob.token });
+  });
+
   test('checks roles, IDs and request bodies', async () => {
     const { id } = (await create()).body.service;
     assert.equal((await app.request('POST', `/queues/${id}/join`, { token: admin.token })).status, 403);
