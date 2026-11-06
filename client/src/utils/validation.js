@@ -43,3 +43,17 @@ export function focusFirstError(errors, order) {
   const first = order.find((field) => errors[field]);
   if (first) document.getElementById(first)?.focus();
 }
+
+export const PHONE_MAX = 20;
+const PHONE_PATTERN = /^\+?[0-9 ().-]{7,20}$/;
+
+// Profile form: name required, phone optional. Matches the server's checks.
+export function validateProfile({ fullName, phone }) {
+  const errors = {};
+  if (!fullName.trim()) errors.fullName = 'Enter your full name.';
+  else if (fullName.trim().length > NAME_MAX) errors.fullName = `Use ${NAME_MAX} characters or fewer.`;
+  if (phone.trim() && !PHONE_PATTERN.test(phone.trim())) {
+    errors.phone = 'Enter 7–20 digits. Spaces, dashes, parentheses and + are fine.';
+  }
+  return errors;
+}

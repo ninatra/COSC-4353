@@ -10,7 +10,7 @@ export function toHistoryRow(entry) {
     ticketId: entry.ticketId,
     serviceId: entry.serviceId,
     serviceName: entry.service?.name ?? 'Deleted service',
-    visitorName: entry.user?.name ?? null,
+    visitorName: entry.user?.profile?.fullName ?? entry.user?.name ?? null,
     email: entry.user?.email ?? null,
     // served | left | removed
     result: RESULTS[entry.status] ?? null,
@@ -55,7 +55,7 @@ export function historyQuery(query) {
   if (query.search) {
     if (typeof query.search !== 'string' || query.search.length > 100) return { error: 'Search must be at most 100 characters' };
     const contains = query.search.trim();
-    where.OR = [{ ticketId: { contains } }, { user: { name: { contains } } }];
+    where.OR = [{ ticketId: { contains } }, { user: { profile: { fullName: { contains } } } }];
   }
   return { where, page, pageSize, skip: (page - 1) * pageSize };
 }

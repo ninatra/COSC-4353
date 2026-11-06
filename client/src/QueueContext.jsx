@@ -111,7 +111,7 @@ export function QueueProvider({ children }) {
       n: n.id, t: minutes(n.createdAt), at: n.createdAt, audience, kind: n.kind, title: n.title, body: n.message,
       serviceId: n.serviceId ? String(n.serviceId) : undefined, ticketId: n.ticketId, notify: true,
     }));
-    const read = { [audience]: notifications.filter(n => n.read).map(n => n.id) };
+    const read = { [audience]: notifications.filter(n => n.status === 'VIEWED').map(n => n.id) };
     const day = value => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const historyRows = history.map(row => ({
       entryId: row.id, email: row.email, visitorName: row.visitorName, date: day(row.endedAt), time: minutes(row.endedAt),

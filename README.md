@@ -87,6 +87,13 @@ Useful commands:
 - **Modules:** authentication (`/api/auth`), service management (`/api/services`), queue management with wait-time estimates (`/api/queues`), notifications (`/api/notifications`) and history (`/api/history`). Business rules live in `server/src/logic/`; input validation lives in `server/src/validation/`.
 - **Tests:** `npm test -w server` runs unit tests for the rules and validation, plus route tests against a throwaway test database. `npm run test:coverage -w server` prints coverage for loaded server source modules; review included files before claiming overall coverage.
 
+## Database (A4)
+
+- **Database:** SQLite, accessed through Prisma. The schema is in `server/prisma/schema.prisma`; `npm run db:sql -w server` writes the matching `CREATE TABLE` statements (primary keys, foreign keys, unique constraints) to `server/prisma/schema.sql`.
+- **Users:** `UserCredentials` holds the login (email as the unique username, bcrypt password hash, role). `UserProfile` holds the full name, optional phone and the "almost ready" alert preference, linked to the login by email. Both are created together at registration; users edit their profile on the Profile page.
+- **Notifications:** each notice has a status of `SENT` or `VIEWED`.
+- **After pulling schema changes:** delete `server/prisma/dev.db` and run `npm run setup` to rebuild the demo data.
+
 ## Project Structure
 
 ```

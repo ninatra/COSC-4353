@@ -114,7 +114,8 @@ describe('notifications API', () => {
     const id = list.notifications[0].id;
     assert.equal((await app.request('PATCH', `/notifications/${id}/read`, { token: user.token })).status, 200);
     list = (await app.request('GET', '/notifications', { token: user.token })).body;
-    assert.equal(list.notifications.find((n) => n.id === id).read, true);
+    assert.equal(list.notifications.find((n) => n.id === id).status, 'VIEWED');
+    assert.ok(list.notifications.filter((n) => n.id !== id).every((n) => n.status === 'SENT'));
 
     assert.equal((await app.request('PATCH', '/notifications/read-all', { token: user.token })).status, 200);
     assert.equal((await app.request('GET', '/notifications', { token: user.token })).body.unread, 0);

@@ -14,6 +14,7 @@ test('history queries combine service, status, dates, search and pagination', ()
  assert.equal(result.where.serviceId, 3);
  assert.equal(result.where.status, 'SERVED');
  assert.equal(result.where.OR[0].ticketId.contains, 'AA-002');
+ assert.equal(result.where.OR[1].user.profile.fullName.contains, 'AA-002');
  assert.equal(result.where.completedAt.lt.toISOString(), '2026-10-24T05:00:00.000Z');
 });
 test('history queries reject invalid pagination, filters and date ranges', () => {

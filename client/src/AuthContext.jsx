@@ -31,6 +31,12 @@ export function AuthProvider({ children }) {
     login: (email, password) =>
       api('/auth/login', { method: 'POST', body: { email, password } }).then(saveSession),
     register: (form) => api('/auth/register', { method: 'POST', body: form }).then(saveSession),
+    // Saves profile changes, then shows the new name everywhere.
+    updateProfile: (changes) =>
+      api('/profile', { method: 'PUT', body: changes }).then((data) => {
+        setUser(data.user);
+        return data.user;
+      }),
     logout: () => {
       tokenStore.clear();
       setUser(null);

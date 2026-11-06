@@ -1,5 +1,6 @@
 /* Forms styles. */
 .form-panel { width: 100%; max-width: none; margin-top: 24px; }
+.profile-panel { max-width: 560px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
 .form-wide { grid-column: 1 / -1; }
 .form-note { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
@@ -7,7 +8,7 @@
 .field { display: grid; gap: 6px; margin-bottom: 20px; }
 .field label, .field legend { font-weight: 700; font-size: 15px; padding: 0; }
 .hint { font-size: 13px; color: var(--muted); }
-.field input:not([type]), .field input[type='text'], .field input[type='email'], .field input[type='password'], .field input[type='number'], .field textarea {
+.field input:not([type]), .field input[type='text'], .field input[type='email'], .field input[type='tel'], .field input[type='password'], .field input[type='number'], .field textarea {
   width: 100%; min-height: 48px; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font: inherit; font-size: 16px; transition: border-color .15s;
 }
 .field select { width: 100%; min-height: 48px; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--panel); color: var(--text); font: inherit; font-size: 16px; }
@@ -45,3 +46,4 @@ fieldset.field { border: 0; margin: 0 0 20px; padding: 0; min-width: 0; }
 @media (forced-colors: active) {
   .field select, .serve-form select, .history-filters select { appearance: auto; background-image: none; }
 }
+.field input[readonly] { background: var(--panel-2); color: var(--muted); }

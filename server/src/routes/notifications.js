@@ -12,11 +12,11 @@ router.get('/', async (req, res) => {
     where: { userId: req.user.id },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
   });
-  res.json({ notifications, unread: notifications.filter((n) => !n.read).length });
+  res.json({ notifications, unread: notifications.filter((n) => n.status === 'SENT').length });
 });
 
 router.patch('/read-all', async (req, res) => {
-  const { count } = await prisma.notification.updateMany({ where: { userId: req.user.id, read: false }, data: { read: true } });
+  const { count } = await prisma.notification.updateMany({ where: { userId: req.user.id, status: 'SENT' }, data: { status: 'VIEWED' } });
   res.json({ updated: count });
 });
 
@@ -24,7 +24,7 @@ router.patch('/:id/read', async (req, res) => {
   const id = parseId(req.params.id);
   if (id === null) return res.status(400).json({ error: 'Notification ID must be a positive integer' });
   // Scoped to the owner, so nobody can mark someone else's notification.
-  const { count } = await prisma.notification.updateMany({ where: { id, userId: req.user.id }, data: { read: true } });
+  const { count } = await prisma.notification.updateMany({ where: { id, userId: req.user.id }, data: { status: 'VIEWED' } });
   if (!count) return res.status(404).json({ error: 'Notification not found' });
   res.json({ message: 'Marked as read' });
 });

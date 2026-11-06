@@ -7,31 +7,21 @@ import { almostReadyNotifications, joinNotifications } from '../src/logic/notifi
 
 const prisma = new PrismaClient();
 
+// Creates or updates a login (UserCredentials) together with its UserProfile.
+function upsertAccount(db, { email, name, passwordHash, role = 'USER' }) {
+  const profile = { upsert: { create: { fullName: name }, update: { fullName: name } } };
+  return db.userCredentials.upsert({
+    where: { email },
+    update: { profile },
+    create: { email, passwordHash, role, emailVerified: true, profile: { create: { fullName: name } } },
+  });
+}
+
 async function main() {
   const passwordHash = await bcrypt.hash('password123', 10);
 
-  await prisma.user.upsert({
-    where: { email: 'admin@queuesmart.dev' },
-    update: {},
-    create: {
-      name: 'Demo Admin',
-      email: 'admin@queuesmart.dev',
-      passwordHash,
-      role: 'ADMIN',
-      emailVerified: true,
-    },
-  });
-  await prisma.user.upsert({
-    where: { email: 'user@queuesmart.dev' },
-    update: { name: 'Hao Pham' },
-    create: {
-      name: 'Hao Pham',
-      email: 'user@queuesmart.dev',
-      passwordHash,
-      role: 'USER',
-      emailVerified: true,
-    },
-  });
+  await upsertAccount(prisma, { email: 'admin@queuesmart.dev', name: 'Demo Admin', passwordHash, role: 'ADMIN' });
+  await upsertAccount(prisma, { email: 'user@queuesmart.dev', name: 'Hao Pham', passwordHash });
 
   if ((await prisma.service.count()) === 0) {
     await prisma.service.createMany({
@@ -84,7 +74,7 @@ async function main() {
     'IT Help Desk': ['Olivia Nguyen', 'Ethan Brown', 'Ava Martinez'],
   };
   const resetQueues = process.argv.includes('--reset-queues');
-  const adminIds = (await prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } })).map((u) => u.id);
+  const adminIds = (await prisma.userCredentials.findMany({ where: { role: 'ADMIN' }, select: { id: true } })).map((u) => u.id);
   let added = 0;
   for (const [serviceName, names] of Object.entries(queuePlans)) {
     const service = await prisma.service.findFirst({ where: { name: serviceName }, orderBy: { id: 'asc' } });
@@ -99,10 +89,7 @@ async function main() {
       }
       for (const [slot, name] of names.entries()) {
         const email = name === 'Hao Pham' ? 'user@queuesmart.dev' : `demo-visitor-${service.id}-${slot + 1}@queuesmart.dev`;
-        const visitor = await db.user.upsert({
-          where: { email }, update: { name },
-          create: { name, email, passwordHash, role: 'USER', emailVerified: true },
-        });
+        const visitor = await upsertAccount(db, { email, name, passwordHash });
         if (resetQueues) {
           await db.queueEntry.updateMany({ where: { userId: visitor.id, status: { in: ['WAITING', 'SERVING'] } }, data: { status: 'LEFT', completedAt: new Date() } });
         } else if (await db.queueEntry.findFirst({ where: { userId: visitor.id } })) continue;
@@ -124,7 +111,7 @@ async function main() {
   }
 
   // A few past visits so the demo user's History screen isn't empty.
-  const demoUser = await prisma.user.findUnique({ where: { email: 'user@queuesmart.dev' } });
+  const demoUser = await prisma.userCredentials.findUnique({ where: { email: 'user@queuesmart.dev' } });
   if (!(await prisma.queueEntry.findFirst({ where: { userId: demoUser.id, status: 'SERVED' } }))) {
     const past = [
       ['IT Help Desk', 'SERVED', 6, { outcome: 'completed', problem: 'Wi-Fi login' }],
@@ -175,13 +162,12 @@ async function main() {
         const email = `demo-history-${service.id}-${slot + 1}@queuesmart.dev`;
         if (slot % 2 !== (keepOddSlots ? 1 : 0)) {
           // Trim only redundant generated history, preserving real visitors' records.
-          const redundant = await db.user.findUnique({ where: { email } });
+          const redundant = await db.userCredentials.findUnique({ where: { email } });
           if (redundant) await db.queueEntry.deleteMany({ where: { userId: redundant.id, serviceId: service.id, completedAt: { not: null } } });
           return;
         }
         const name = historyVisitors[service.name][slot];
-        const visitor = await db.user.upsert({ where: { email }, update: { name },
-          create: { name, email, passwordHash, role: 'USER', emailVerified: true } });
+        const visitor = await upsertAccount(db, { email, name, passwordHash });
         if (await db.queueEntry.findFirst({ where: { userId: visitor.id, serviceId: service.id, completedAt: { not: null } } })) return;
         const endedAt = new Date(Date.now() - sample.daysAgo * 86400000 - slot * 3 * 60000);
         const servedAt = sample.status === 'SERVED' ? new Date(endedAt.getTime() - service.expectedDuration * 60000) : null;

@@ -8,7 +8,7 @@ describe('history rows', () => {
 
   test('served visits show the staff outcome; others show how they ended', () => {
     const served = toHistoryRow({ ...base, status: 'SERVED', outcome: 'referred', completedAt: '2026-10-01T09:20:00Z',
-      service: { name: 'IT Help Desk' }, user: { name: 'Hao Pham', email: 'hao@school.edu' } });
+      service: { name: 'IT Help Desk' }, user: { email: 'hao@school.edu', profile: { fullName: 'Hao Pham' } } });
     assert.equal(served.result, 'served');
     assert.equal(served.outcome, 'referred');
     assert.equal(served.serviceName, 'IT Help Desk');

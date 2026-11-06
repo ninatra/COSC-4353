@@ -11,18 +11,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
+// Login data only. Passwords are stored as bcrypt hashes, never as plain text.
+model UserCredentials {
   id                Int      @id @default(autoincrement())
-  name              String
-  email             String   @unique
+  email             String   @unique // the username
   passwordHash      String
   role              String   @default("USER") // USER | ADMIN
   emailVerified     Boolean  @default(false)
   verificationToken String?  @unique
   createdAt         DateTime @default(now())
 
+  profile       UserProfile?
   queueEntries  QueueEntry[]
   notifications Notification[]
+}
+
+// Personal details and preferences, linked to the login by email.
+model UserProfile {
+  id                Int      @id @default(autoincrement())
+  email             String   @unique
+  fullName          String // at most 50 characters (checked in src/validation)
+  phone             String? // optional, at most 20 characters
+  almostReadyAlerts Boolean  @default(true) // preference: "almost ready" / "you're next" notices
+  updatedAt         DateTime @updatedAt
+
+  credentials UserCredentials @relation(fields: [email], references: [email], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model Service {
@@ -47,23 +60,23 @@ model Service {
 // One row per time a user joins a queue. Rows are never deleted, so they
 // double as the user's queue history and the source for admin statistics.
 model QueueEntry {
-  id          Int       @id @default(autoincrement())
-  ticketId    String?
-  manualOrder Int? // admin order overrides priority/arrival; new visitors append
+  id              Int       @id @default(autoincrement())
+  ticketId        String?
+  manualOrder     Int? // admin order overrides priority/arrival; new visitors append
   initialPosition Int? // position at join, used for progress toward the front
-  userId      Int
-  serviceId   Int
-  priority    String    @default("MEDIUM") // LOW | MEDIUM | HIGH
-  status      String    @default("WAITING") // WAITING | SERVING | SERVED | LEFT | NO_SHOW
-  joinedAt    DateTime  @default(now())
-  servedAt    DateTime? // when service started
-  completedAt DateTime? // when service ended or the user left
-  problem     String    @default("")
-  outcome     String?
-  notes       String    @default("")
+  userId          Int
+  serviceId       Int
+  priority        String    @default("MEDIUM") // LOW | MEDIUM | HIGH
+  status          String    @default("WAITING") // WAITING | SERVING | SERVED | LEFT | NO_SHOW
+  joinedAt        DateTime  @default(now())
+  servedAt        DateTime? // when service started
+  completedAt     DateTime? // when service ended or the user left
+  problem         String    @default("")
+  outcome         String?
+  notes           String    @default("")
 
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service Service @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  user    UserCredentials @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service         @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@index([serviceId, status])
   @@index([userId])
@@ -78,10 +91,10 @@ model Notification {
   serviceId Int?
   ticketId  String?
   entryId   Int? // queue entry the notice is about; prevents duplicate "almost ready" alerts
-  read      Boolean  @default(false)
+  status    String   @default("SENT") // SENT | VIEWED
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user UserCredentials @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId, read])
+  @@index([userId, status])
 }

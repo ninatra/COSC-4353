@@ -5,6 +5,7 @@ import AdminOverview from './pages/AdminOverview.jsx';
 import History from './pages/History.jsx';
 import Login from './pages/Login.jsx';
 import MyTicket from './pages/MyTicket.jsx';
+import Profile from './pages/Profile.jsx';
 import Overview from './pages/Overview.jsx';
 import Register from './pages/Register.jsx';
 import ServiceDetail from './pages/ServiceDetail.jsx';
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/ticket" element={<MyTicket />} />
         <Route path="/history" element={<History />} />
         <Route path="/updates" element={<Updates />} />
+        <Route path="/profile" element={<Profile />} />
       </Route>
 
       <Route element={<ProtectedRoute role="ADMIN" />}>
@@ -41,6 +43,7 @@ export default function App() {
         <Route path="/admin/queues/:serviceId" element={<WaitingLists />} />
         <Route path="/admin/history" element={<History />} />
         <Route path="/admin/updates" element={<Updates />} />
+        <Route path="/admin/profile" element={<Profile />} />
       </Route>
 
       <Route path="*" element={loading ? null : <Navigate to={user ? homePath(user) : '/login'} replace />} />

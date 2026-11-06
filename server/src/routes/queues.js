@@ -4,12 +4,13 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { parseServiceId } from '../validation/service.js';
 import { orderQueue, joinError, positionInQueue, validateCompletion, formatTicketId, validateReorder } from '../logic/queue.js';
 import { almostReadyNotifications, joinNotifications, leftNotification, servedNotification } from '../logic/notifications.js';
+import { identity, identitySelect } from '../logic/users.js';
 
 const router = Router();
 router.use(requireAuth);
 const active = ['WAITING', 'SERVING'];
 // Select only public identity fields; password hashes and tokens never leave the server.
-const include = { user: { select: { name: true, email: true } }, service: true };
+const include = { user: { select: identitySelect }, service: true };
 const fail = (status, message) => Object.assign(new Error(message), { status });
 
 // Tells visitors who just reached the front of the line, once per visit.
@@ -18,7 +19,13 @@ async function alertAlmostReady(db, service) {
   const alerted = await db.notification.findMany({
     where: { kind: { in: ['almost', 'next'] }, entryId: { in: ordered.map(entry => entry.id) } }, select: { entryId: true, kind: true },
   });
-  const data = almostReadyNotifications(ordered, alerted.filter(n => n.kind === 'almost').map(n => n.entryId), service, alerted.filter(n => n.kind === 'next').map(n => n.entryId));
+  const notices = almostReadyNotifications(ordered, alerted.filter(n => n.kind === 'almost').map(n => n.entryId), service, alerted.filter(n => n.kind === 'next').map(n => n.entryId));
+  // Respect each visitor's profile preference for these alerts.
+  const muted = await db.userProfile.findMany({
+    where: { almostReadyAlerts: false, credentials: { id: { in: notices.map(n => n.userId) } } }, select: { credentials: { select: { id: true } } },
+  });
+  const mutedIds = new Set(muted.map(p => p.credentials.id));
+  const data = notices.filter(n => !mutedIds.has(n.userId));
   if (data.length) await db.notification.createMany({ data });
 }
 
@@ -35,7 +42,7 @@ router.get('/', async (req, res) => {
   for (const entry of entries) {
     const { user, service, ...data } = entry;
     (queues[entry.serviceId] ??= []).push({ ...data,
-      ...(req.user.role === 'ADMIN' || entry.userId === req.user.id ? { user } : {}),
+      ...(req.user.role === 'ADMIN' || entry.userId === req.user.id ? { user: identity(user) } : {}),
     });
   }
   // The active ticket wins; otherwise show the most recently finished visit.
@@ -57,7 +64,7 @@ router.get('/:serviceId', requireRole('ADMIN'), async (req, res) => {
   const service = await prisma.service.findUnique({ where: { id: req.serviceId } });
   if (!service) return res.status(404).json({ error: 'Service not found' });
   const entries = await prisma.queueEntry.findMany({ where: { serviceId: req.serviceId, status: { in: active } }, include });
-  res.json({ queue: orderQueue(entries) });
+  res.json({ queue: orderQueue(entries).map(entry => ({ ...entry, user: identity(entry.user) })) });
 });
 
 router.post('/:serviceId/join', requireRole('USER'), async (req, res) => {
@@ -75,7 +82,7 @@ router.post('/:serviceId/join', requireRole('USER'), async (req, res) => {
     const joined = await db.queueEntry.update({ where: { id: created.id }, data: {
       ticketId: formatTicketId(service.name, created.id), initialPosition: position,
     } });
-    const admins = await db.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
+    const admins = await db.userCredentials.findMany({ where: { role: 'ADMIN' }, select: { id: true } });
     await db.notification.createMany({ data: joinNotifications({
       entry: joined, service, position, waitingCount: entries.length, userId: req.user.id, adminIds: admins.map(a => a.id),
     }) });

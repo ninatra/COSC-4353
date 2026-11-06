@@ -60,6 +60,14 @@ describe('auth API', () => {
     assert.equal(reg.body.user.role, 'USER');
     assert.ok(reg.body.token);
     assert.equal(reg.body.user.passwordHash, undefined, 'never returns the password hash');
+    assert.equal(reg.body.user.name, 'Hao Pham');
+
+    // Login data and profile are separate tables; the password is stored hashed.
+    const stored = await app.prisma.userCredentials.findUnique({ where: { email: 'new@school.edu' }, include: { profile: true } });
+    assert.notEqual(stored.passwordHash, 'password123');
+    assert.match(stored.passwordHash, /^\$2[aby]\$10\$/);
+    assert.equal(stored.profile.fullName, 'Hao Pham');
+    assert.equal(stored.profile.almostReadyAlerts, true);
 
     const login = await app.request('POST', '/auth/login', { body: { email: 'NEW@school.edu', password: 'password123' } });
     assert.equal(login.status, 200);
@@ -91,13 +99,13 @@ describe('auth API', () => {
 
   test('/me returns 404 when the account no longer exists', async () => {
     const { token, user } = await app.account();
-    await app.prisma.user.delete({ where: { id: user.id } });
+    await app.prisma.userCredentials.delete({ where: { id: user.id } });
     assert.equal((await app.request('GET', '/auth/me', { token })).status, 404);
   });
 
   test('email verification links work once', async () => {
     const { user } = await app.account();
-    const { verificationToken } = await app.prisma.user.findUnique({ where: { id: user.id } });
+    const { verificationToken } = await app.prisma.userCredentials.findUnique({ where: { id: user.id } });
     assert.equal((await app.request('GET', `/auth/verify/${verificationToken}`)).status, 200);
     assert.equal((await app.request('GET', `/auth/verify/${verificationToken}`)).status, 400);
   });

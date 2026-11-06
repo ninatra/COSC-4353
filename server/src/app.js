@@ -5,6 +5,7 @@ import serviceRoutes from './routes/services.js';
 import queueRoutes from './routes/queues.js';
 import notificationRoutes from './routes/notifications.js';
 import historyRoutes from './routes/history.js';
+import profileRoutes from './routes/profile.js';
 
 export const app = express();
 
@@ -17,6 +18,7 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/queues', queueRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/history', historyRoutes);
+app.use('/api/profile', profileRoutes);
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'Not found' }));
 

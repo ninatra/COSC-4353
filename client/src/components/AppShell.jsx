@@ -184,6 +184,10 @@ function AccountMenu({ user, isAdmin, onSignOut }) {
             <span>{user.email}</span>
             <span className="acct-role">{isAdmin ? 'Administrator' : 'User'}</span>
           </p>
+          <Link className="acct-item" to={isAdmin ? '/admin/profile' : '/profile'} onClick={() => setOpen(false)}>
+            <Icon name="user" />
+            Profile
+          </Link>
           <button type="button" className="acct-item" onClick={onSignOut}>
             <Icon name="log-out" />
             Sign out

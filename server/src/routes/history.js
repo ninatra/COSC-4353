@@ -4,10 +4,11 @@ import { requireAuth, requireRole } from '../middleware/auth.js';
 import { FINISHED_STATUSES, sortHistory, toHistoryRow, historyQuery } from '../logic/history.js';
 import { validateCompletion } from '../logic/queue.js';
 import { parseServiceId as parseId } from '../validation/service.js';
+import { identitySelect } from '../logic/users.js';
 
 const router = Router();
 router.use(requireAuth);
-const include = { user: { select: { name: true, email: true } }, service: { select: { name: true } } };
+const include = { user: { select: identitySelect }, service: { select: { name: true } } };
 
 // Users see their own finished visits; administrators see every visit.
 router.get('/', async (req, res) => {
