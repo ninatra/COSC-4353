@@ -108,7 +108,7 @@ export function QueueProvider({ children }) {
     }
     const audience = user.role === 'ADMIN' ? 'admin' : user.email;
     const updates = notifications.map(n => ({
-      n: n.id, t: minutes(n.createdAt), audience, kind: n.kind, title: n.title, body: n.message,
+      n: n.id, t: minutes(n.createdAt), at: n.createdAt, audience, kind: n.kind, title: n.title, body: n.message,
       serviceId: n.serviceId ? String(n.serviceId) : undefined, ticketId: n.ticketId, notify: true,
     }));
     const read = { [audience]: notifications.filter(n => n.read).map(n => n.id) };
@@ -259,10 +259,6 @@ export function QueueProvider({ children }) {
     markAllUpdatesRead,
     dismissTicket: (email) => { dismissedTicket.current = latest.current.tickets[email]?.entryId; return run('dismissTicket')(email); },
     markCelebrated: run('markCelebrated'),
-    resetDemo: () => {
-      latest.current = { ...seed(), services: latest.current.services, queues: latest.current.queues, tickets: latest.current.tickets, counters: {} };
-      setState(latest.current);
-    },
   };
 
   if (user && (serviceStatus.owner !== user.id || serviceStatus.loading)) return <p className="loading" role="status">Loading services…</p>;

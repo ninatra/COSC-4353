@@ -1,7 +1,6 @@
 import { useAuth } from '../AuthContext.jsx';
 import EmptyState from '../components/EmptyState.jsx';
 import Icon from '../components/Icon.jsx';
-import { DEMO_DATE } from '../mockData.js';
 import { fillService, notificationsFor, updatesFor } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
 import { fmtTime } from '../utils/format.js';
@@ -15,6 +14,25 @@ const UPDATE_STYLE = {
   removed: ['user-minus', 'peach'], closed: ['lock', 'peach'], opened: ['lock-open', 'mint'],
   edit: ['pencil', 'lilac'], created: ['plus', 'lilac'], wait: ['clock', 'sun'], reorder: ['list-ordered', 'lilac'],
 };
+
+// "Today · Oct 22, 2026", "Yesterday · Oct 21, 2026" or "Oct 18, 2026".
+function dayLabel(iso) {
+  const date = iso ? new Date(iso) : new Date();
+  const full = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const daysAgo = Math.round((new Date(new Date().toDateString()) - new Date(date.toDateString())) / 86400000);
+  return daysAgo === 0 ? `Today · ${full}` : daysAgo === 1 ? `Yesterday · ${full}` : full;
+}
+
+// Splits a newest-first list into [label, updates] groups, one per day.
+function byDay(updates) {
+  const groups = [];
+  for (const update of updates) {
+    const label = dayLabel(update.at);
+    if (groups.at(-1)?.[0] !== label) groups.push([label, []]);
+    groups.at(-1)[1].push(update);
+  }
+  return groups;
+}
 
 export default function Updates() {
   const { user } = useAuth();
@@ -65,32 +83,36 @@ export default function Updates() {
         <EmptyState icon="bell" title="All caught up" body="New queue updates and service notices will appear here." />
       ) : (
         <>
-          <p className="day-label">Today · {DEMO_DATE}</p>
-          <ol className="ulist">
-            {updates.map((update) => {
-              const [icon, tint] = UPDATE_STYLE[update.kind] ?? ['info', 'blue'];
-              return (
-                <li className={`uitem ${unread.has(update.n) ? 'is-unread' : ''}`} key={update.n}>
-                  <span className={`tile tint-${tint}`} aria-hidden="true"><Icon name={icon} /></span>
-                  <div>
-                    <h3>
-                      {unread.has(update.n) && <span className="unread-dot" aria-label="Unread" />}
-                      {update.title}
-                    </h3>
-                    <p>{fillService(state, update.body, update.serviceId)}</p>
-                  </div>
-                  <div className="uitem-meta">
-                    <time>{fmtTime(update.t)}</time>
-                    {unread.has(update.n) && (
-                      <button type="button" className="notification-read" onClick={() => markUpdateRead(audience, update.n)}>
-                        Mark as read
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
+          {byDay(updates).map(([label, items]) => (
+            <section key={label} aria-label={label}>
+              <p className="day-label">{label}</p>
+              <ol className="ulist">
+                {items.map((update) => {
+                  const [icon, tint] = UPDATE_STYLE[update.kind] ?? ['info', 'blue'];
+                  return (
+                    <li className={`uitem ${unread.has(update.n) ? 'is-unread' : ''}`} key={update.n}>
+                      <span className={`tile tint-${tint}`} aria-hidden="true"><Icon name={icon} /></span>
+                      <div>
+                        <h3>
+                          {unread.has(update.n) && <span className="unread-dot" aria-label="Unread" />}
+                          {update.title}
+                        </h3>
+                        <p>{fillService(state, update.body, update.serviceId)}</p>
+                      </div>
+                      <div className="uitem-meta">
+                        <time>{fmtTime(update.t)}</time>
+                        {unread.has(update.n) && (
+                          <button type="button" className="notification-read" onClick={() => markUpdateRead(audience, update.n)}>
+                            Mark as read
+                          </button>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+          ))}
         </>
       )}
     </>

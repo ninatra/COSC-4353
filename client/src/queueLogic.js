@@ -48,7 +48,8 @@ export function updatesFor(state, audience) {
   return state.updates
     .filter((u) => u.audience === audience && u.n > clearedUpTo &&
       (audience !== 'admin' || !['opened', 'closed'].includes(u.kind)))
-    .sort((a, b) => b.t - a.t || b.n - a.n);
+    // Newer updates have higher numbers, which also works across days.
+    .sort((a, b) => b.n - a.n);
 }
 
 export function notificationsFor(state, audience) {
