@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+import { after, before, describe, test } from 'node:test';
+import { sampleService, startApp } from './helpers/app.js';
 import { validateService, parseServiceId } from '../src/validation/service.js';
 
 const service = {
@@ -88,9 +89,11 @@ test('service IDs must be positive integer strings within the database range', (
 for (const [field, limit] of Object.entries({ location: 120, contact: 200, hours: 120, instructions: 500 })) {
   test(`${field} accepts trimmed text, supports clearing, and enforces its length limit`, () => {
     assert.equal(validateService({ ...service, [field]: ' Room 112 ' }).data[field], 'Room 112');
-    assert.deepEqual(validateService({ [field]: '' }, true), { data: { [field]: '' } });
+    assert.deepEqual(validateService({ [field]: '' }, true), { data: { [field]: null } });
+    assert.deepEqual(validateService({ [field]: null }, true), { data: { [field]: null } });
+    assert.deepEqual(validateService({ [field]: '   ' }, true), { data: { [field]: null } });
     assert.equal(validateService({ [field]: 'a'.repeat(limit) }, true).data[field].length, limit);
-    for (const value of [null, undefined, 12, {}, [], 'a'.repeat(limit + 1)]) {
+    for (const value of [undefined, 12, {}, [], 'a'.repeat(limit + 1)]) {
       assert.ok(validateService({ [field]: value }, true).error);
     }
   });
@@ -113,4 +116,76 @@ test('capacity accepts positive integers or null and rejects invalid limits', ()
   for (const maxCapacity of [undefined, 0, -1, 1.5, '12', true, 2147483648]) {
     assert.ok(validateService({ maxCapacity }, true).error);
   }
+});
+
+describe('services API', () => {
+  let app;
+  let admin;
+  let alice;
+  before(async () => {
+    app = await startApp('services');
+    admin = await app.account('ADMIN');
+    alice = await app.account('USER', 'Alice');
+  });
+  after(() => app.close());
+  const create = async overrides => app.request('POST', '/services', { token: admin.token, body: sampleService(overrides) });
+
+  test('admins create, update, list and delete services', async () => {
+    const created = await create({ name: '  Library Desk ', location: 'Room 1', maxCapacity: 5 });
+    assert.equal(created.status, 201);
+    assert.equal(created.body.service.name, 'Library Desk');
+    const { id } = created.body.service;
+
+    const updated = await app.request('PUT', `/services/${id}`, { token: admin.token, body: { isOpen: false, expectedDuration: 12 } });
+    assert.equal(updated.body.service.isOpen, false);
+    assert.equal(updated.body.service.expectedDuration, 12);
+
+    const list = await app.request('GET', '/services', { token: alice.token });
+    assert.ok(list.body.services.some((s) => s.id === id));
+
+    assert.equal((await app.request('DELETE', `/services/${id}`, { token: admin.token })).status, 200);
+    assert.equal((await app.request('DELETE', `/services/${id}`, { token: admin.token })).status, 404);
+  });
+
+  test('optional service details default to null and can be cleared and retrieved', async () => {
+    const fields = ['location', 'hours', 'contact', 'instructions'];
+    const created = await create();
+    assert.equal(created.status, 201);
+    const id = created.body.service.id;
+    for (const field of fields) assert.equal(created.body.service[field], null);
+    await app.request('PUT', `/services/${id}`, { token: admin.token, body: Object.fromEntries(fields.map(field => [field, 'Saved text'])) });
+    const cleared = await app.request('PUT', `/services/${id}`, { token: admin.token, body: { location: null, hours: '', contact: null, instructions: '   ' } });
+    assert.equal(cleared.status, 200);
+    const fetched = (await app.request('GET', '/services', { token: alice.token })).body.services.find(row => row.id === id);
+    const stored = await app.prisma.service.findUnique({ where: { id } });
+    for (const field of fields) {
+      assert.equal(fetched[field], null);
+      assert.equal(stored[field], null);
+    }
+  });
+
+  test('rejects missing, wrongly typed and too-long fields', async () => {
+    assert.equal((await create({ name: '' })).status, 400);
+    assert.equal((await create({ name: 'x'.repeat(101) })).status, 400);
+    assert.equal((await create({ description: 'x'.repeat(501) })).status, 400);
+    assert.equal((await create({ expectedDuration: '10' })).status, 400);
+    assert.equal((await create({ priority: 'URGENT' })).status, 400);
+    assert.equal((await app.request('POST', '/services', { token: admin.token, body: [] })).status, 400);
+    assert.equal((await app.request('PUT', '/services/abc', { token: admin.token, body: { isOpen: true } })).status, 400);
+    assert.equal((await app.request('PUT', '/services/99999', { token: admin.token, body: { isOpen: true } })).status, 404);
+    assert.equal((await app.request('PUT', '/services/1', { token: admin.token, body: { isOpen: 'yes' } })).status, 400);
+    assert.equal((await app.request('DELETE', '/services/abc', { token: admin.token })).status, 400);
+  });
+
+  test('only administrators can change services', async () => {
+    assert.equal((await app.request('POST', '/services', { token: alice.token, body: sampleService() })).status, 403);
+    assert.equal((await app.request('GET', '/services')).status, 401);
+  });
+
+  test("a service with visit history can't be deleted", async () => {
+    const { id } = (await create()).body.service;
+    await app.request('POST', `/queues/${id}/join`, { token: alice.token });
+    await app.request('POST', `/queues/${id}/leave`, { token: alice.token });
+    assert.equal((await app.request('DELETE', `/services/${id}`, { token: admin.token })).status, 409);
+  });
 });

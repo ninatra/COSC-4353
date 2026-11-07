@@ -11,6 +11,7 @@ export default function Profile() {
   const isAdmin = user.role === 'ADMIN';
   const [form, setForm] = useState({
     fullName: user.name ?? '',
+    email: user.email,
     phone: user.phone ?? '',
     almostReadyAlerts: user.almostReadyAlerts ?? true,
   });
@@ -29,12 +30,12 @@ export default function Profile() {
     const found = validateProfile(form);
     setErrors(found);
     if (Object.keys(found).length) {
-      focusFirstError(found, ['fullName', 'phone']);
+      focusFirstError(found, ['fullName', 'email', 'phone']);
       return;
     }
     setSaving(true);
     try {
-      await updateProfile({ fullName: form.fullName.trim(), phone: form.phone.trim() || null, almostReadyAlerts: form.almostReadyAlerts });
+      await updateProfile({ email: form.email.trim(), fullName: form.fullName.trim(), phone: form.phone.trim() || null, almostReadyAlerts: form.almostReadyAlerts });
       toast('Profile saved');
     } catch (error) {
       setServerError(error.message);
@@ -49,7 +50,7 @@ export default function Profile() {
       <h1 id="page-title" tabIndex={-1}>
         Profile
       </h1>
-      <p className="lead">Your name and contact details. Your email is your username and can't be changed here.</p>
+      <p className="lead">Update your name and contact details. Your email is also your login username.</p>
 
       <form className="panel form-panel profile-panel" onSubmit={handleSubmit} noValidate>
         {serverError && (
@@ -57,9 +58,6 @@ export default function Profile() {
             <FieldError>{serverError}</FieldError>
           </div>
         )}
-        <FormField id="email" label="Email">
-          <input type="email" value={user.email} readOnly {...fieldProps('email')} />
-        </FormField>
         <FormField
           id="fullName"
           label="Full name"
@@ -67,6 +65,9 @@ export default function Profile() {
           counter={<span className="counter">{form.fullName.trim().length}/{NAME_MAX}</span>}
         >
           <input type="text" autoComplete="name" value={form.fullName} onChange={update('fullName')} {...fieldProps('fullName', { error: errors.fullName })} />
+        </FormField>
+        <FormField id="email" label="Email" error={errors.email}>
+          <input type="email" autoComplete="email" value={form.email} onChange={update('email')} {...fieldProps('email', { error: errors.email })} />
         </FormField>
         <FormField id="phone" label="Phone (optional)" hint="Staff can use this if they need to reach you about a visit." error={errors.phone}>
           <input

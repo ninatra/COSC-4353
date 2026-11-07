@@ -116,4 +116,31 @@ describe('auth API', () => {
     assert.equal(res.body.error, 'Not found');
     assert.equal((await app.request('GET', '/health')).body.status, 'ok');
   });
+
+  test('backend rejects malformed bodies and passwords beyond bcrypt byte limits', () => {
+    for (const body of [null, [], 'text', 12]) {
+      assert.equal(validateRegistration(body).status, 400);
+      assert.equal(validateLogin(body).status, 400);
+    }
+    const details = { name: 'Valid Name', email: 'valid@test.dev', password: 'é'.repeat(37) };
+    assert.match(validateRegistration(details).error, /72 bytes/);
+    assert.equal(validateLogin(details).status, 400);
+  });
+
+  test('concurrent duplicate registrations return a conflict without creating partial accounts', async () => {
+    const body = { name: 'Concurrent User', email: 'concurrent@test.dev', password: 'password123' };
+    const responses = await Promise.all([
+      app.request('POST', '/auth/register', { body }),
+      app.request('POST', '/auth/register', { body }),
+    ]);
+    assert.deepEqual(responses.map(response => response.status).sort(), [201, 409]);
+    assert.equal(await app.prisma.userCredentials.count({ where: { email: body.email } }), 1);
+    assert.equal(await app.prisma.userProfile.count({ where: { email: body.email } }), 1);
+  });
+
+  test('broken JSON is a 400 with a clear message', async () => {
+    const res = await app.request('POST', '/auth/login', { raw: '{bad json' });
+    assert.equal(res.status, 400);
+    assert.match(res.body.error, /valid JSON/);
+  });
 });

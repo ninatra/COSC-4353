@@ -5,6 +5,12 @@ import { PHONE_MAX, validateProfile } from '../src/validation/profile.js';
 import { sampleService, startApp } from './helpers/app.js';
 
 describe('profile validation', () => {
+  test('normalizes emails and rejects invalid addresses', () => {
+    assert.deepEqual(validateProfile({ email: ' New@School.edu ' }).data, { email: 'new@school.edu' });
+    for (const email of ['', null, 42, 'invalid', 'a'.repeat(255) + '@school.edu']) {
+      assert.match(validateProfile({ email }).error, /Email/);
+    }
+  });
   test('accepts a partial update and cleans the values', () => {
     assert.deepEqual(validateProfile({ fullName: '  Hao Pham ', phone: ' (713) 555-0100 ', almostReadyAlerts: false }).data,
       { fullName: 'Hao Pham', phone: '(713) 555-0100', almostReadyAlerts: false });
@@ -50,6 +56,36 @@ describe('profile API and database', () => {
   let app;
   before(async () => { app = await startApp('profile'); });
   after(() => app.close());
+
+  test('changes login email, preserves the profile and session, and resets verification', async () => {
+    const { token, user } = await app.account();
+    await app.prisma.userCredentials.update({ where: { id: user.id }, data: { emailVerified: true } });
+    const before = await app.prisma.userProfile.findUnique({ where: { email: user.email } });
+    const saved = await app.request('PUT', '/profile', { token, body: { email: ' Changed@School.edu ', fullName: 'Changed Name' } });
+    assert.equal(saved.status, 200);
+    assert.equal(saved.body.user.email, 'changed@school.edu');
+    assert.equal(saved.body.user.emailVerified, false);
+    const profile = await app.prisma.userProfile.findUnique({ where: { email: 'changed@school.edu' } });
+    assert.equal(profile.id, before.id);
+    assert.equal(profile.fullName, 'Changed Name');
+    assert.equal((await app.request('GET', '/auth/me', { token })).body.user.email, 'changed@school.edu');
+    assert.equal((await app.request('POST', '/auth/login', { body: { email: user.email, password: 'password123' } })).status, 401);
+    assert.equal((await app.request('POST', '/auth/login', { body: { email: 'changed@school.edu', password: 'password123' } })).status, 200);
+    const credentials = await app.prisma.userCredentials.findUnique({ where: { id: user.id } });
+    assert.ok(credentials.verificationToken);
+    assert.equal((await app.request('GET', `/auth/verify/${credentials.verificationToken}`)).status, 200);
+  });
+
+  test('duplicate emails roll back all profile changes', async () => {
+    const first = await app.account();
+    const second = await app.account();
+    const result = await app.request('PUT', '/profile', { token: first.token, body: { email: second.user.email.toUpperCase(), fullName: 'Should not save' } });
+    assert.equal(result.status, 409);
+    const me = await app.request('GET', '/auth/me', { token: first.token });
+    assert.equal(me.body.user.email, first.user.email);
+    assert.equal(me.body.user.name, first.user.name);
+    assert.equal((await app.request('PUT', '/profile', { token: first.token, body: { email: first.user.email } })).status, 200);
+  });
 
   test('reads and updates the signed-in profile, and the change persists', async () => {
     const { token, user } = await app.account('USER', 'Ann Lee');

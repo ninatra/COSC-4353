@@ -36,11 +36,20 @@ export function historyQuery(query) {
   if (query.serviceId) {
     const id = Number(query.serviceId);
     if (!Number.isSafeInteger(id) || id < 1) return { error: 'Invalid service ID' };
-    where.serviceId = id;
+    where.entry = { queue: { serviceId: id } };
   }
   if (query.status) {
     if (!FINISHED_STATUSES.includes(query.status)) return { error: 'Invalid visit status' };
     where.status = query.status;
+  }
+  if (query.outcome) {
+    if (!['completed', 'referred', 'unresolved', 'follow-up'].includes(query.outcome)) {
+      return { error: 'Invalid visit outcome' };
+    }
+    where.status = 'SERVED';
+    // Older served visits without an outcome are displayed as completed.
+    if (query.outcome === 'completed') where.OR = [{ outcome: 'completed' }, { outcome: null }];
+    else where.outcome = query.outcome;
   }
   const dates = {};
   for (const [key, operator] of [['from', 'gte'], ['to', 'lt']]) {
@@ -55,7 +64,7 @@ export function historyQuery(query) {
   if (query.search) {
     if (typeof query.search !== 'string' || query.search.length > 100) return { error: 'Search must be at most 100 characters' };
     const contains = query.search.trim();
-    where.OR = [{ ticketId: { contains } }, { user: { profile: { fullName: { contains } } } }];
+    where.entry = { ...where.entry, OR: [{ ticketId: { contains } }, { user: { profile: { fullName: { contains } } } }] };
   }
   return { where, page, pageSize, skip: (page - 1) * pageSize };
 }

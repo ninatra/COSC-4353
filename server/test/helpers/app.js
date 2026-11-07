@@ -25,6 +25,8 @@ export async function startApp(name) {
 
   const { app } = await import('../../src/app.js');
   const { prisma } = await import('../../src/db.js');
+  const { applyConstraints } = await import('../../prisma/constraints.js');
+  await applyConstraints(prisma);
   const server = await new Promise((resolve) => {
     const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
   });

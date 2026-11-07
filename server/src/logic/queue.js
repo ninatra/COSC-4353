@@ -7,7 +7,7 @@ export function formatTicketId(serviceName, entryId) {
 }
 
 export function orderQueue(entries) {
-  return [...entries].sort((a, b) => ((a.manualOrder ?? Infinity) - (b.manualOrder ?? Infinity) || 0)
+  return [...entries].sort((a, b) => ((a.position ?? a.manualOrder ?? Infinity) - (b.position ?? b.manualOrder ?? Infinity) || 0)
     || (rank[a.priority] ?? 1) - (rank[b.priority] ?? 1)
     || new Date(a.joinedAt) - new Date(b.joinedAt) || a.id - b.id);
 }

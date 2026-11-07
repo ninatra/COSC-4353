@@ -48,8 +48,11 @@ export const PHONE_MAX = 20;
 const PHONE_PATTERN = /^\+?[0-9 ().-]{7,20}$/;
 
 // Profile form: name required, phone optional. Matches the server's checks.
-export function validateProfile({ fullName, phone }) {
+export function validateProfile({ email, fullName, phone }) {
   const errors = {};
+  const emailError = checkEmail(email);
+  if (emailError) errors.email = emailError;
+  else if (email.trim().length > 254) errors.email = 'Use 254 characters or fewer.';
   if (!fullName.trim()) errors.fullName = 'Enter your full name.';
   else if (fullName.trim().length > NAME_MAX) errors.fullName = `Use ${NAME_MAX} characters or fewer.`;
   if (phone.trim() && !PHONE_PATTERN.test(phone.trim())) {

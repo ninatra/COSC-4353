@@ -164,7 +164,6 @@ function ServiceForm({ service }) {
     if (!form.name.trim()) found.name = 'Enter a service name.';
     else if (form.name.trim().length > NAME_MAX) found.name = `Keep the service name to ${NAME_MAX} characters or fewer.`;
     if (!form.description.trim()) found.description = 'Enter a short description.';
-    if (!form.location.trim()) found.location = 'Enter the service location.';
     const expectedDuration = Number(form.expectedDuration);
     if (!form.expectedDuration.trim()) found.expectedDuration = 'Enter the expected visit duration.';
     else if (!Number.isInteger(expectedDuration) || expectedDuration < 1) found.expectedDuration = 'Use a whole number of minutes greater than zero.';
@@ -179,8 +178,8 @@ function ServiceForm({ service }) {
     }
     const values = {
       name: form.name.trim(), description: form.description.trim(), expectedDuration, priority: form.priority, isOpen: form.isOpen,
-      location: form.location.trim(), contact: form.contact.trim(), hours: form.hours.trim(), category: form.category,
-      maxCapacity, instructions: form.instructions.trim(),
+      location: form.location.trim() || null, contact: form.contact.trim() || null, hours: form.hours.trim() || null, category: form.category,
+      maxCapacity, instructions: form.instructions.trim() || null,
     };
     setSaving(true);
     try {
@@ -213,8 +212,8 @@ function ServiceForm({ service }) {
           <FormField id="expectedDuration" label="Expected duration" suffix="minutes per visit" error={errors.expectedDuration}>
             <input type="number" required min="1" step="1" inputMode="numeric" value={form.expectedDuration} onChange={update('expectedDuration')} {...fieldProps('expectedDuration', { error: errors.expectedDuration })} />
           </FormField>
-          <FormField id="location" label="Location" hint="Building, room number, or virtual service details." error={errors.location}>
-            <input type="text" required maxLength={LOCATION_MAX} value={form.location} onChange={update('location')} {...fieldProps('location', { error: errors.location, hint: true })} />
+          <FormField id="location" label="Location (optional)" hint="Building, room number, or virtual service details." error={errors.location}>
+            <input type="text" maxLength={LOCATION_MAX} value={form.location} onChange={update('location')} {...fieldProps('location', { error: errors.location, hint: true })} />
           </FormField>
           <div className={`field ${errors.category ? 'has-error' : ''}`}>
             <label htmlFor="category">Category</label>
@@ -223,16 +222,16 @@ function ServiceForm({ service }) {
             </select>
             {errors.category && <FieldError id="category-err">{errors.category}</FieldError>}
           </div>
-          <FormField id="hours" label="Hours of operation" error={errors.hours}>
+          <FormField id="hours" label="Hours of operation (optional)" error={errors.hours}>
             <input type="text" maxLength={HOURS_MAX} placeholder="Mon-Fri, 8:00 AM-5:00 PM" value={form.hours} onChange={update('hours')} {...fieldProps('hours', { error: errors.hours })} />
           </FormField>
-          <FormField id="contact" label="Contact information" hint="Email address, phone number, or website." error={errors.contact}>
+          <FormField id="contact" label="Contact information (optional)" hint="Email address, phone number, or website." error={errors.contact}>
             <input type="text" maxLength={CONTACT_MAX} value={form.contact} onChange={update('contact')} {...fieldProps('contact', { error: errors.contact, hint: true })} />
           </FormField>
           <FormField id="maxCapacity" label="Maximum queue capacity" hint="Leave blank for no limit." error={errors.maxCapacity}>
             <input type="number" min="1" step="1" inputMode="numeric" value={form.maxCapacity} onChange={update('maxCapacity')} {...fieldProps('maxCapacity', { error: errors.maxCapacity, hint: true })} />
           </FormField>
-          <FormField id="instructions" label="Additional instructions" className="form-wide" hint="Tell students what to bring or do before joining." error={errors.instructions}>
+          <FormField id="instructions" label="Additional instructions (optional)" className="form-wide" hint="Tell students what to bring or do before joining." error={errors.instructions}>
             <textarea maxLength={INSTRUCTIONS_MAX} value={form.instructions} onChange={update('instructions')} {...fieldProps('instructions', { error: errors.instructions, hint: true })} />
           </FormField>
           <fieldset className={`field form-wide ${errors.priority ? 'has-error' : ''}`}>

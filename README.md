@@ -40,7 +40,7 @@ Administrators can create and maintain services, manage active queues, monitor q
 
 ## Getting Started
 
-**Requirements:** Node.js 20 or newer.
+**Requirements:** Node.js 22 or newer (also used by CI and the coverage gate).
 
 ```bash
 # 1. Install dependencies for the client and server
@@ -49,19 +49,21 @@ npm install
 # 2. Create your local settings file
 cp server/.env.example server/.env
 
-# 3. Create the database and load demo data
+# 3. Create/update the database and install validation constraints
 npm run setup
 
 # 4. Start the API (port 4000) and the web app (port 5173) together
 npm run dev
 ```
 
-Open http://localhost:5173 and log in with a demo account (password `password123`):
+Open http://localhost:5173 and sign in with an existing account or register a new one. Setup and startup preserve existing records and do not add sample students or reset queues.
 
-| Role          | Email                |
-| ------------- | -------------------- |
+For a separate demo database, optionally run `npm run db:seed -w server` to create sample accounts and queue data. The sample accounts use password `password123`:
+
+| Role | Email |
+| --- | --- |
 | Administrator | admin@queuesmart.dev |
-| User          | user@queuesmart.dev  |
+| User | user@queuesmart.dev |
 
 To register a new administrator, use the admin code set in `ADMIN_SIGNUP_CODE` in `server/.env`.
 Email verification links are printed in the server console instead of being emailed.
@@ -69,30 +71,38 @@ Email verification links are printed in the server console instead of being emai
 Useful commands:
 
 - `npm run db:studio -w server` opens a browser UI for viewing and editing the database.
-- `cd server` then `node --env-file=.env prisma/seed.js --reset-queues` restores sample queues while preserving services, accounts, and history. Previous active entries become Left records.
-- Demo services, visitors, and past visits are defined in `server/prisma/seed.js`; restarting the app preserves database changes.
+
+- Optional sample services, visitors, and past visits are defined in `server/prisma/seed.js`. Seeding is not part of normal setup or startup.
+- `cd server` then `node --env-file=.env prisma/seed.js --reset-queues` restores sample queues while preserving accounts, services, and history.
 
 ## Front End (A2)
 
 - **Stack:** React + Vite with plain CSS (styles in `client/src/styles/`, imported by `client/src/index.css`, with light and dark themes) and lucide-react icons. React gives us reusable components for the ticket, service cards and dialogs; Vite keeps development fast; plain CSS with custom properties keeps the design system in one place without a UI kit.
 - **Backend integration:** services, queues, notifications and history all come from the API. Queue changes refresh immediately; other devices refresh every 10 seconds.
+- **Form submissions and persistence:** registration/login and profile forms call `/api/auth` and `/api/profile`; service forms call `/api/services`; queue completion/removal forms call `/api/queues`; history edits call `/api/history`. The API writes through Prisma to SQLite before confirming success. Reloads fetch saved records from the API; business records are not loaded from demo data or browser storage. Notification read/clear changes are also saved through the API, and failed saves display an error.
 - **Wait estimate:** people ahead × the service's expected visit length. This is a deliberate simplification for the demo.
 - **In-app notifications:** users receive join confirmation, Almost ready at position 2, You’re next at position 1, and served/left/removed notices. Admin bell alerts cover first visitors and full queues; routine joins appear in activity history. No email/SMS is sent.
+- **Repeat alerts:** moving from position 3 or farther back to 2 sends Almost ready again; moving from position 2 or farther back to 1 sends You’re next again. Unchanged positions and backward moves do not trigger alerts. Profile notification preferences still apply.
 - **Queue management:** admins complete visits with an outcome and optional issue/notes, reorder with drag-and-drop or arrows, and remove visitors with an optional reason. Manual order takes precedence over ticket priority and arrival time; new visitors append after manual reordering.
-- **History:** admins browse 15 visits per page, defaulting to Today, with service tabs, date range, status, and student/ticket search. All entries support editing; left/removed visits allow notes only.
+- **History:** admins browse 15 visits per page, defaulting to All dates, with service tabs, date range, status, outcome, and student/ticket search. All entries support editing; left/removed visits allow notes only.
 
 ## Back End (A3)
 
 - **Stack:** Node.js with Express 5 (REST API), Prisma with SQLite, bcryptjs for password hashing and JWT for login sessions. Tests use Node's built-in test runner.
 - **Modules:** authentication (`/api/auth`), service management (`/api/services`), queue management with wait-time estimates (`/api/queues`), notifications (`/api/notifications`) and history (`/api/history`). Business rules live in `server/src/logic/`; input validation lives in `server/src/validation/`.
-- **Tests:** `npm test -w server` runs unit tests for the rules and validation, plus route tests against a throwaway test database. `npm run test:coverage -w server` prints coverage for loaded server source modules; review included files before claiming overall coverage.
+- **Tests:** `npm test -w server` runs unit, API, raw-SQL validation, migration/backup/rollback, seed, and process-restart persistence tests against isolated databases. `npm run test:coverage -w server` includes both `server/src/**/*.js` and `server/prisma/**/*.js` and fails if aggregate line, branch, or function coverage falls below **80%**. The existing GitHub Actions workflow runs this coverage gate on pull requests and pushes to main.
+- **Persistence test:** `cd server` then `node --test test/persistence.test.js` verifies registration, profile/email changes, service edits, queue tickets, history, and notification changes remain retrievable across separate requests and API process restarts, using an isolated SQLite database.
 
 ## Database (A4)
 
 - **Database:** SQLite, accessed through Prisma. The schema is in `server/prisma/schema.prisma`; `npm run db:sql -w server` writes the matching `CREATE TABLE` statements (primary keys, foreign keys, unique constraints) to `server/prisma/schema.sql`.
 - **Users:** `UserCredentials` holds the login (email as the unique username, bcrypt password hash, role). `UserProfile` holds the full name, optional phone and the "almost ready" alert preference, linked to the login by email. Both are created together at registration; users edit their profile on the Profile page.
 - **Notifications:** each notice has a status of `SENT` or `VIEWED`.
-- **After pulling schema changes:** delete `server/prisma/dev.db` and run `npm run setup` to rebuild the demo data.
+- **Queues:** each service has one `Queue` with `OPEN`/`CLOSED` status and a created date. `QueueEntry` links a visitor to that queue, stores their 1-based position while waiting, and uses `WAITING`, `SERVED`, or `CANCELED` status. Positions update after reordering and departures.
+- **History:** finished entries have a separate `History` record for completion/served times, outcome, problem, and notes. History also distinguishes voluntary departures from admin removals. Entries retain their ticket IDs; their position becomes null when finished.
+- **Validation:** API validators enforce required fields, types, formats, and lengths before writing. SQLite triggers enforce required nonblank text, field lengths, integer ranges, booleans, dates, and allowed statuses for inserts and updates, including direct SQL. Unique email indexes and foreign keys protect account identity and relations. Passwords accept 8–72 characters with a maximum of 72 UTF-8 bytes before bcrypt hashing.
+- **Installing database validation:** `npm run setup` installs it automatically. For an existing database, run `npm run db:constraints -w server`. This checks existing records first and reports invalid data without changing it. After a manual `prisma db push`, rerun that command because a table rebuild can remove triggers. `schema.sql` and the validation migration also include these constraints.
+- **Upgrading the previous combined queue schema:** stop the app, run `npm run db:upgrade-queues -w server`, then `npx prisma generate --schema server/prisma/schema.prisma` and restart. The upgrade saves a backup and preserves existing accounts, queues, and visits. New databases use `npm run setup`.
 
 ## Project Structure
 

@@ -1,69 +1,17 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { seed, STATE_VERSION } from './mockData.js';
-import { actions } from './queueLogic.js';
 import { api } from './api.js';
 import { useAuth } from './AuthContext.jsx';
 
-// Services, queues, notifications and history come from the API. Browser
-// storage only keeps local display preferences (such as the confetti flag).
-const STORAGE_KEY = 'queuesmart_demo_v3';
-
+// Business data is loaded from the API; browser storage only holds the login
+// token and theme. Ticket celebration/dismissal are display state for this visit.
 const QueueContext = createContext(null);
-
-// Keep saved demos compatible with the previous service field names.
-function normalizeServices(state) {
-  state.services = state.services.map(({ desc, duration, open, ...service }) => ({
-    ...service,
-    description: service.description ?? desc,
-    expectedDuration: service.expectedDuration ?? duration,
-    isOpen: service.isOpen ?? open,
-  }));
-  return state;
-}
-
-function load() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved?.v === STATE_VERSION) return normalizeServices(saved);
-  } catch {
-    // Storage blocked or corrupt: start from the seed data.
-  }
-  return seed();
-}
+const emptyState = () => ({ services: [], queues: {}, tickets: {}, updates: [], read: {}, cleared: {}, history: [] });
 
 export function QueueProvider({ children }) {
   const { user } = useAuth();
-  const [state, setState] = useState(() => ({ ...load(), services: [] }));
+  const [state, setState] = useState(emptyState);
   const [serviceStatus, setServiceStatus] = useState({ owner: null, loading: true, error: '' });
-  // Latest state, so an action can return its message synchronously.
   const latest = useRef(state);
-
-  useEffect(() => {
-    latest.current = state;
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...state, services: [] }));
-    } catch {
-      // Not saved; the demo still works for this page load.
-    }
-  }, [state]);
-
-  useEffect(() => {
-    function onStorage(event) {
-      if (event.key !== STORAGE_KEY || !event.newValue) return;
-      try {
-        const next = normalizeServices(JSON.parse(event.newValue));
-        next.services = latest.current.services;
-        next.queues = latest.current.queues;
-        next.tickets = latest.current.tickets;
-        latest.current = next;
-        setState(next);
-      } catch {
-        // Ignore a bad value written by another tab.
-      }
-    }
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
 
   function displayService(service) {
     const categoryIcons = { Academic: 'graduation-cap', Financial: 'landmark', Technology: 'laptop', 'Student support': 'id-card' };
@@ -81,7 +29,9 @@ export function QueueProvider({ children }) {
   const dismissedTicket = useRef(null);
   const requestVersion = useRef(0);
   const account = useRef(user?.id);
+  const currentEmail = useRef(user?.email);
   account.current = user?.id;
+  currentEmail.current = user?.email;
 
   async function refreshQueues() {
     const version = ++requestVersion.current;
@@ -89,7 +39,7 @@ export function QueueProvider({ children }) {
     const [{ services }, snapshot, { notifications }, { history }] = await Promise.all([
       api('/services'), api('/queues'), api('/notifications'), user.role === 'ADMIN' ? Promise.resolve({ history: [] }) : api('/history'),
     ]);
-    if (version !== requestVersion.current || owner !== account.current) return;
+    if (version !== requestVersion.current || owner !== account.current || user.email !== currentEmail.current) return;
     const minutes = value => { const date = new Date(value); return date.getHours() * 60 + date.getMinutes(); };
     const ticketId = entry => entry.ticketId;
     const queues = Object.fromEntries(Object.entries(snapshot.queues).map(([id, entries]) => [id, entries.map(entry => ({
@@ -123,7 +73,10 @@ export function QueueProvider({ children }) {
   }
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      commit(emptyState());
+      return;
+    }
     let cancelled = false;
     dismissedTicket.current = null;
     setServiceStatus({ owner: user.id, loading: true, error: '' });
@@ -139,7 +92,7 @@ export function QueueProvider({ children }) {
     refresh();
     const timer = setInterval(refresh, 10000);
     return () => { cancelled = true; ++requestVersion.current; clearInterval(timer); };
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?.role, user?.email]);
 
   async function saveService(values, serviceId) {
     const { service } = await api(serviceId ? `/services/${serviceId}` : '/services', {
@@ -155,20 +108,16 @@ export function QueueProvider({ children }) {
   async function toggleOpen(serviceId) {
     const current = latest.current.services.find(s => s.id === serviceId);
     const { service } = await api(`/services/${serviceId}`, { method: 'PUT', body: { isOpen: !current.isOpen } });
-    const draft = structuredClone(latest.current);
-    const message = actions.toggleOpen(draft, serviceId);
-    draft.services = draft.services.map(s => s.id === serviceId ? displayService(service) : s);
-    commit(draft);
-    return message;
+    commit({ ...latest.current, services: latest.current.services.map(s => s.id === serviceId ? displayService(service) : s) });
+    return `${service.name} ${service.isOpen ? 'is open' : 'is closed to new visitors'}`;
   }
 
   async function deleteService(serviceId) {
+    const service = latest.current.services.find(s => s.id === serviceId);
     if (latest.current.queues[serviceId]?.length) throw new Error('Clear the queue before deleting this service.');
     await api(`/services/${serviceId}`, { method: 'DELETE' });
-    const draft = structuredClone(latest.current);
-    const message = actions.deleteService(draft, serviceId);
-    commit(draft);
-    return message;
+    commit({ ...latest.current, services: latest.current.services.filter(s => s.id !== serviceId) });
+    return `Deleted ${service.name}`;
   }
 
   async function join(serviceId) {
@@ -208,15 +157,16 @@ export function QueueProvider({ children }) {
     return 'Visit completed';
   }
 
-  // Notification actions update the screen right away, then save to the server.
-  function markUpdateRead(audience, id) {
-    run('markUpdateRead')(audience, id);
-    api(`/notifications/${id}/read`, { method: 'PATCH' }).catch(() => refreshQueues().catch(() => {}));
+  // Update the screen only after the database confirms the change.
+  async function markUpdateRead(audience, id) {
+    await api(`/notifications/${id}/read`, { method: 'PATCH' });
+    const read = latest.current.read[audience] ?? [];
+    commit({ ...latest.current, read: { ...latest.current.read, [audience]: [...new Set([...read, id])] } });
   }
 
-  function markAllUpdatesRead(audience) {
-    run('markAllUpdatesRead')(audience);
-    api('/notifications/read-all', { method: 'PATCH' }).catch(() => refreshQueues().catch(() => {}));
+  async function markAllUpdatesRead(audience) {
+    await api('/notifications/read-all', { method: 'PATCH' });
+    await refreshQueues();
   }
 
   async function clearUpdates(audience) {
@@ -232,16 +182,19 @@ export function QueueProvider({ children }) {
     return 'Visit history updated';
   }
 
-  // Each action runs on a copy of the state and returns its toast message, if any.
-  const run =
-    (name) =>
-    (...args) => {
-      const draft = structuredClone(latest.current);
-      const message = actions[name](draft, ...args);
-      latest.current = draft;
-      setState(draft);
-      return message;
-    };
+  function dismissTicket(email) {
+    const ticket = latest.current.tickets[email];
+    if (ticket?.status !== 'served') return;
+    dismissedTicket.current = ticket.entryId;
+    const tickets = { ...latest.current.tickets };
+    delete tickets[email];
+    commit({ ...latest.current, tickets });
+  }
+
+  function markCelebrated(email) {
+    const ticket = latest.current.tickets[email];
+    if (ticket) commit({ ...latest.current, tickets: { ...latest.current.tickets, [email]: { ...ticket, celebrated: true } } });
+  }
 
   const value = {
     state,
@@ -257,8 +210,8 @@ export function QueueProvider({ children }) {
     clearUpdates,
     markUpdateRead,
     markAllUpdatesRead,
-    dismissTicket: (email) => { dismissedTicket.current = latest.current.tickets[email]?.entryId; return run('dismissTicket')(email); },
-    markCelebrated: run('markCelebrated'),
+    dismissTicket,
+    markCelebrated,
   };
 
   if (user && (serviceStatus.owner !== user.id || serviceStatus.loading)) return <p className="loading" role="status">Loading services…</p>;

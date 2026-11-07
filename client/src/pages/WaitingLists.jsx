@@ -7,7 +7,6 @@ import StatusLabel from '../components/StatusLabel.jsx';
 import { useToast } from '../components/Toast.jsx';
 import { findService, queueOf } from '../queueLogic.js';
 import { useQueues } from '../QueueContext.jsx';
-import { DEMO_EMAIL } from '../mockData.js';
 import { formatWait, fmtTime, hashTint, initials, pad, people } from '../utils/format.js';
 
 export default function WaitingLists() {
@@ -228,7 +227,6 @@ export default function WaitingLists() {
                 <span className="sr-only">Position {i + 1}: </span>
                 <span className="qname">{v.name}</span>
                 {i === 0 && <span className="tag tag-next">Next</span>}
-                {v.email === DEMO_EMAIL && <span className="tag tag-you">Signed-in user</span>}
                 <div className="qmeta">
                   <span className="mono">{v.id}</span> · joined {fmtTime(v.joinedAt)} · waits {formatWait(i * service.expectedDuration)}
                 </div>

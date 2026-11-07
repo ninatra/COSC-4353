@@ -5,7 +5,23 @@ import { PrismaClient } from '@prisma/client';
 import { formatTicketId, orderQueue, positionInQueue } from '../src/logic/queue.js';
 import { almostReadyNotifications, joinNotifications } from '../src/logic/notifications.js';
 
+import { serviceFilter, finishEntry } from '../src/logic/entries.js';
+
 const prisma = new PrismaClient();
+
+async function createVisit(db, { serviceId, priority, servedAt, completedAt, outcome, problem, notes, status = 'WAITING', ...data }) {
+  const queue = await db.queue.findUniqueOrThrow({ where: { serviceId } });
+  const waiting = status === 'WAITING';
+  const position = waiting ? await db.queueEntry.count({ where: { queueId: queue.id, status: 'WAITING' } }) + 1 : null;
+  return db.queueEntry.create({ data: {
+    ...data, queueId: queue.id, position, status: waiting ? 'WAITING' : status === 'SERVED' ? 'SERVED' : 'CANCELED',
+    ...(!waiting ? { history: { create: { status, servedAt, completedAt, outcome, problem, notes } } } : {}),
+  } });
+}
+
+async function resetEntries(db, where) {
+  for (const entry of await db.queueEntry.findMany({ where })) await finishEntry(db, entry, 'LEFT');
+}
 
 // Creates or updates a login (UserCredentials) together with its UserProfile.
 function upsertAccount(db, { email, name, passwordHash, role = 'USER' }) {
@@ -68,6 +84,10 @@ async function main() {
     if (Object.keys(data).length) await prisma.service.update({ where: { id: service.id }, data });
   }
 
+  for (const service of await prisma.service.findMany()) {
+    await prisma.queue.upsert({ where: { serviceId: service.id }, create: { serviceId: service.id }, update: {} });
+  }
+
   const queuePlans = {
     'Academic Advising': ['Maya Chen', 'Jordan Lee', 'Sofia Garcia', 'Grace Park', 'Hao Pham'],
     'Financial Aid': ['Liam Patel', 'Emma Wilson', 'Noah Davis', 'Daniel Rivera'],
@@ -80,32 +100,29 @@ async function main() {
     const service = await prisma.service.findFirst({ where: { name: serviceName }, orderBy: { id: 'asc' } });
     if (!service) continue;
     await prisma.$transaction(async (db) => {
+      const previous = orderQueue(await db.queueEntry.findMany({ where: { ...serviceFilter(service.id), status: 'WAITING' } }));
       if (resetQueues) {
         // Explicit demo reset preserves past visits while replacing these queues.
-        await db.queueEntry.updateMany({
-          where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } },
-          data: { status: 'LEFT', completedAt: new Date() },
-        });
+        await resetEntries(db, { ...serviceFilter(service.id), status: 'WAITING' });
       }
       for (const [slot, name] of names.entries()) {
         const email = name === 'Hao Pham' ? 'user@queuesmart.dev' : `demo-visitor-${service.id}-${slot + 1}@queuesmart.dev`;
         const visitor = await upsertAccount(db, { email, name, passwordHash });
         if (resetQueues) {
-          await db.queueEntry.updateMany({ where: { userId: visitor.id, status: { in: ['WAITING', 'SERVING'] } }, data: { status: 'LEFT', completedAt: new Date() } });
+          await resetEntries(db, { userId: visitor.id, status: 'WAITING' });
         } else if (await db.queueEntry.findFirst({ where: { userId: visitor.id } })) continue;
-        const waiting = await db.queueEntry.count({ where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } } });
+        const waiting = await db.queueEntry.count({ where: { ...serviceFilter(service.id), status: { in: ['WAITING', 'SERVING'] } } });
         if (service.maxCapacity !== null && waiting >= service.maxCapacity) break;
         const joinedAt = new Date(Date.now() - (names.length - slot) * 4 * 60000);
-        const entry = await db.queueEntry.create({ data: { userId: visitor.id, serviceId: service.id, priority: 'MEDIUM', joinedAt } });
-        const entries = await db.queueEntry.findMany({ where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } } });
+        const entry = await createVisit(db, { userId: visitor.id, serviceId: service.id, priority: 'MEDIUM', joinedAt });
+        const entries = await db.queueEntry.findMany({ where: { ...serviceFilter(service.id), status: { in: ['WAITING', 'SERVING'] } } });
         const { position } = positionInQueue(entries, entry.id, service.expectedDuration);
         const joined = await db.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id), initialPosition: position } });
         await db.notification.createMany({ data: joinNotifications({ entry: joined, service, position, waitingCount: entries.length, userId: visitor.id, adminIds }) });
         added++;
       }
-      const ordered = orderQueue(await db.queueEntry.findMany({ where: { serviceId: service.id, status: { in: ['WAITING', 'SERVING'] } } }));
-      const alerted = await db.notification.findMany({ where: { kind: 'almost', entryId: { in: ordered.map((e) => e.id) } }, select: { entryId: true } });
-      const almost = almostReadyNotifications(ordered, alerted.map((n) => n.entryId), service);
+      const ordered = orderQueue(await db.queueEntry.findMany({ where: { ...serviceFilter(service.id), status: { in: ['WAITING', 'SERVING'] } } }));
+      const almost = almostReadyNotifications(ordered, previous, service);
       if (almost.length) await db.notification.createMany({ data: almost });
     });
   }
@@ -123,10 +140,10 @@ async function main() {
       if (!service) continue;
       const joinedAt = new Date(Date.now() - daysAgo * 86400000);
       const endedAt = new Date(joinedAt.getTime() + 25 * 60000);
-      const entry = await prisma.queueEntry.create({ data: {
+      const entry = await createVisit(prisma, {
         userId: demoUser.id, serviceId: service.id, status, joinedAt, completedAt: endedAt,
         servedAt: status === 'SERVED' ? endedAt : null, ...details,
-      } });
+      });
       await prisma.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id) } });
     }
   }
@@ -163,20 +180,20 @@ async function main() {
         if (slot % 2 !== (keepOddSlots ? 1 : 0)) {
           // Trim only redundant generated history, preserving real visitors' records.
           const redundant = await db.userCredentials.findUnique({ where: { email } });
-          if (redundant) await db.queueEntry.deleteMany({ where: { userId: redundant.id, serviceId: service.id, completedAt: { not: null } } });
+          if (redundant) await db.queueEntry.deleteMany({ where: { userId: redundant.id, ...serviceFilter(service.id), history: { isNot: null } } });
           return;
         }
         const name = historyVisitors[service.name][slot];
         const visitor = await upsertAccount(db, { email, name, passwordHash });
-        if (await db.queueEntry.findFirst({ where: { userId: visitor.id, serviceId: service.id, completedAt: { not: null } } })) return;
+        if (await db.queueEntry.findFirst({ where: { userId: visitor.id, ...serviceFilter(service.id), history: { isNot: null } } })) return;
         const endedAt = new Date(Date.now() - sample.daysAgo * 86400000 - slot * 3 * 60000);
         const servedAt = sample.status === 'SERVED' ? new Date(endedAt.getTime() - service.expectedDuration * 60000) : null;
         const joinedAt = new Date((servedAt ?? endedAt).getTime() - (10 + slot * 5) * 60000);
-        const entry = await db.queueEntry.create({ data: {
+        const entry = await createVisit(db, {
           userId: visitor.id, serviceId: service.id, status: sample.status,
           priority: 'MEDIUM', joinedAt, servedAt, completedAt: endedAt,
           outcome: sample.outcome ?? null, problem: sample.status === 'SERVED' ? problems[service.name] : '', notes: sample.status === 'LEFT' ? '' : sample.notes,
-        } });
+        });
         await db.queueEntry.update({ where: { id: entry.id }, data: { ticketId: formatTicketId(service.name, entry.id) } });
         historyAdded++;
       });

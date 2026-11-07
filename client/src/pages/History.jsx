@@ -79,7 +79,7 @@ function AdminHistory({ state }) {
   const editDialogRef = useRef(null);
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState({ outcome: 'completed', problem: '', notes: '' });
-  const [filters, setFilters] = useState({ serviceId: '', period: 'today', status: '', search: '', from: '', to: '' });
+  const [filters, setFilters] = useState({ serviceId: '', period: 'all', status: '', outcome: '', search: '', from: '', to: '' });
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ history: [], total: 0 });
   const [loading, setLoading] = useState(true);
@@ -88,7 +88,14 @@ function AdminHistory({ state }) {
   const [saving, setSaving] = useState(false);
   const pageSize = 15;
   const pages = Math.max(1, Math.ceil(data.total / pageSize));
-  const change = (key, value) => { setFilters(previous => ({ ...previous, [key]: value })); setPage(1); };
+  const change = (key, value) => {
+    setFilters(previous => ({
+      ...previous, [key]: value,
+      ...(key === 'outcome' && value ? { status: 'SERVED' } : {}),
+      ...(key === 'status' && value !== 'SERVED' ? { outcome: '' } : {}),
+    }));
+    setPage(1);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -96,7 +103,7 @@ function AdminHistory({ state }) {
     const timer = setTimeout(async () => {
       try {
         const query = new URLSearchParams({ paginated: 'true', page: String(page), pageSize: String(pageSize) });
-        for (const key of ['serviceId', 'status', 'search']) if (filters[key]) query.set(key, filters[key]);
+        for (const key of ['serviceId', 'status', 'outcome', 'search']) if (filters[key]) query.set(key, filters[key]);
         const start = new Date(); start.setHours(0, 0, 0, 0);
         const end = new Date(start); end.setDate(end.getDate() + 1);
         if (filters.period === 'yesterday') { start.setDate(start.getDate() - 1); end.setDate(end.getDate() - 1); }
@@ -139,7 +146,7 @@ function AdminHistory({ state }) {
           </button>
         ))}
       </div>
-      <div className="history-filters panel">
+      <div className={`history-filters panel${filters.period === 'custom' ? ' history-filters-custom' : ''}`}>
         <label>Date range<select value={filters.period} onChange={e => change('period', e.target.value)}>
           <option value="today">Today</option><option value="yesterday">Yesterday</option><option value="week">Last 7 days</option><option value="all">All dates</option><option value="custom">Custom range</option>
         </select></label>
@@ -147,7 +154,15 @@ function AdminHistory({ state }) {
         <label>Status<select value={filters.status} onChange={e => change('status', e.target.value)}>
           <option value="">All statuses</option><option value="SERVED">Served</option><option value="LEFT">Left</option><option value="NO_SHOW">Removed</option>
         </select></label>
-        <label className="history-search">Search<input type="search" maxLength={100} placeholder="Student name or ticket ID" value={filters.search} onChange={e => change('search', e.target.value)} /></label>
+        <label>Outcome<select value={filters.outcome} onChange={e => change('outcome', e.target.value)}>
+          <option value="">All outcomes</option><option value="completed">Completed</option><option value="referred">Referred</option><option value="unresolved">Unresolved</option><option value="follow-up">Follow-up</option>
+        </select></label>
+        <label className="history-search">Search
+          <span className="history-search-input">
+            <Icon name="search" />
+            <input type="search" maxLength={100} placeholder="Student name or ticket ID" value={filters.search} onChange={e => change('search', e.target.value)} />
+          </span>
+        </label>
 
       </div>
       <div className="history-results-head"><p role="status">{loading ? 'Loading visits…' : `${data.total} matching visits`}</p><button type="button" className="btn btn-secondary btn-sm" disabled={loading} onClick={() => setRevision(v => v + 1)}>Refresh</button></div>

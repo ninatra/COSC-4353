@@ -31,7 +31,7 @@ describe('notification rules', () => {
     assert.match(full.find((n) => n.kind === 'capacity').message, /3 of 3/);
   });
 
-  test('visitors in the first two places get one "almost ready" notice', () => {
+  test('new arrivals in the first two places receive an alert', () => {
     const ordered = [10, 11, 12].map((id) => ({ id, userId: id, ticketId: `IT-0${id}`, status: 'WAITING' }));
     const notices = almostReadyNotifications(ordered, [], service);
     assert.equal(ALMOST_READY_POSITION, 2);
@@ -39,17 +39,26 @@ describe('notification rules', () => {
     assert.match(notices[0].message, /You're next/);
     assert.match(notices[1].message, /One person is ahead/);
     assert.match(notices[0].message, /Room 112/);
-    assert.deepEqual(almostReadyNotifications(ordered, [], service, [10]).map((n) => n.entryId), [11]);
-    assert.deepEqual(almostReadyNotifications(ordered, [11], service, [10]), []);
+    assert.deepEqual(almostReadyNotifications(ordered, ordered.slice(0, 1), service).map(n => n.entryId), [11]);
+    assert.deepEqual(almostReadyNotifications(ordered, ordered, service), []);
   });
 
   test('a position-two notice does not prevent the separate position-one notice', () => {
     const entry = { id: 12, userId: 12, status: 'WAITING' };
-    const notices = almostReadyNotifications([entry], [12], service);
+    const notices = almostReadyNotifications([entry], [{ id: 11 }, entry], service);
     assert.equal(notices.length, 1);
     assert.equal(notices[0].kind, 'next');
     assert.equal(notices[0].title, "You're next");
-    assert.deepEqual(almostReadyNotifications([entry], [12], service, [12]), []);
+    assert.deepEqual(almostReadyNotifications([entry], [entry], service), []);
+  });
+
+  test('alerts repeat on returning from farther back, but not on moving backward', () => {
+    const entries = [1, 2, 3].map(id => ({ id, userId: id, status: 'WAITING' }));
+    const moved = [entries[0], entries[2], entries[1]];
+    assert.deepEqual(almostReadyNotifications(entries, moved, service).map(n => [n.entryId, n.kind]), [[2, 'almost']]);
+    const front = [entries[1], entries[0], entries[2]];
+    assert.deepEqual(almostReadyNotifications(front, entries, service).map(n => [n.entryId, n.kind]), [[2, 'next']]);
+    assert.deepEqual(almostReadyNotifications(front, front, service), []);
   });
 
   test('someone already being served is not told they are almost ready', () => {
@@ -103,6 +112,52 @@ describe('notifications API', () => {
 
     await app.request('POST', `/queues/${serviceId}/leave`, { token: third.token });
     assert.equal((await kinds(third.token))[0], 'left');
+  });
+
+  test('reordering away and back sends fresh alerts even after earlier notices are viewed or cleared', async () => {
+    const id = (await app.request('POST', '/services', { token: admin.token, body: sampleService() })).body.service.id;
+    const visitors = await Promise.all([app.account(), app.account(), app.account()]);
+    const ids = [];
+    for (const visitor of visitors) {
+      ids.push((await app.request('POST', `/queues/${id}/join`, { token: visitor.token })).body.entry.id);
+    }
+    const target = visitors[1];
+    const notices = async () => (await app.request('GET', '/notifications', { token: target.token })).body.notifications;
+    const reorder = async (previousIds, entryIds) => {
+      assert.equal((await app.request('PUT', `/queues/${id}/reorder`, { token: admin.token, body: { previousIds, entryIds } })).status, 200);
+    };
+    assert.equal((await notices()).filter(n => n.kind === 'almost').length, 1);
+    await app.request('PATCH', '/notifications/read-all', { token: target.token });
+    const back = [ids[0], ids[2], ids[1]];
+    await reorder(ids, back);
+    assert.equal((await notices()).filter(n => n.kind === 'almost').length, 1);
+    await reorder(back, ids);
+    const repeated = (await notices()).filter(n => n.kind === 'almost');
+    assert.equal(repeated.length, 2);
+    assert.equal(repeated[0].status, 'SENT');
+    await reorder(ids, ids);
+    await app.request('GET', '/queues', { token: target.token });
+    assert.equal((await notices()).filter(n => n.kind === 'almost').length, 2);
+    const front = [ids[1], ids[0], ids[2]];
+    await reorder(ids, front);
+    assert.equal((await notices()).filter(n => n.kind === 'next').length, 1);
+    await reorder(front, ids);
+    assert.equal((await notices()).filter(n => n.kind === 'almost').length, 2, 'moving 1 to 2 sends nothing');
+    await reorder(ids, front);
+    assert.equal((await notices()).filter(n => n.kind === 'next').length, 2);
+    await app.request('DELETE', '/notifications', { token: target.token });
+    await reorder(front, front);
+    assert.equal((await notices()).length, 0, 'clearing notifications does not retrigger unchanged positions');
+    await app.request('PUT', '/profile', { token: target.token, body: { almostReadyAlerts: false } });
+    await reorder(front, back);
+    await reorder(back, ids);
+    assert.equal((await notices()).length, 0, 'repeat alerts respect profile preferences');
+    await app.request('PUT', '/profile', { token: target.token, body: { almostReadyAlerts: true } });
+    await reorder(ids, back);
+    await app.request('POST', `/queues/${id}/leave`, { token: visitors[2].token });
+    assert.equal((await notices()).filter(n => n.kind === 'almost').length, 1, 'leaving advances the visitor into position 2');
+    await app.request('DELETE', `/queues/${id}/entries/${ids[0]}`, { token: admin.token });
+    assert.equal((await notices()).filter(n => n.kind === 'next').length, 1, 'removal advances the visitor into position 1');
   });
 
   test('marks one or all as read, and clears the list', async () => {

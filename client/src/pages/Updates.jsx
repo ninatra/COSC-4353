@@ -65,7 +65,7 @@ export default function Updates() {
         </div>
         <div className="notification-actions">
           {unread.size > 0 && (
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => markAllUpdatesRead(audience)}>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={() => markAllUpdatesRead(audience).catch(error => toast(error.message))}>
               Mark all as read
             </button>
           )}
@@ -102,7 +102,7 @@ export default function Updates() {
                       <div className="uitem-meta">
                         <time>{fmtTime(update.t)}</time>
                         {unread.has(update.n) && (
-                          <button type="button" className="notification-read" onClick={() => markUpdateRead(audience, update.n)}>
+                          <button type="button" className="notification-read" onClick={() => markUpdateRead(audience, update.n).catch(error => toast(error.message))}>
                             Mark as read
                           </button>
                         )}

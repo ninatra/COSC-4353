@@ -7,6 +7,9 @@ const isText = (value) => typeof value === 'string' && value.trim() !== '';
 
 // Returns { data } with cleaned values, or { status, error }.
 export function validateRegistration(body, adminCode) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { status: 400, error: 'Registration details must be an object' };
+  }
   const { name, email, password, role = 'USER', adminCode: givenCode } = body ?? {};
   if (!isText(name) || !isText(email) || !isText(password)) {
     return { status: 400, error: 'Name, email and password are required and must be text' };
@@ -23,6 +26,9 @@ export function validateRegistration(body, adminCode) {
   if (password.length > LIMITS.passwordMax) {
     return { status: 400, error: `Password must be at most ${LIMITS.passwordMax} characters` };
   }
+  if (Buffer.byteLength(password, 'utf8') > LIMITS.passwordMax) {
+    return { status: 400, error: 'Password must be at most 72 bytes in UTF-8' };
+  }
   if (!ROLES.includes(role)) {
     return { status: 400, error: 'Role must be USER or ADMIN' };
   }
@@ -33,11 +39,14 @@ export function validateRegistration(body, adminCode) {
 }
 
 export function validateLogin(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { status: 400, error: 'Login details must be an object' };
+  }
   const { email, password } = body ?? {};
   if (!isText(email) || !isText(password)) {
     return { status: 400, error: 'Email and password are required and must be text' };
   }
-  if (email.trim().length > LIMITS.email || password.length > LIMITS.passwordMax) {
+  if (email.trim().length > LIMITS.email || Buffer.byteLength(password, 'utf8') > LIMITS.passwordMax) {
     return { status: 400, error: 'Email or password is too long' };
   }
   return { data: { email: email.trim().toLowerCase(), password } };

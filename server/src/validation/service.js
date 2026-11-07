@@ -32,10 +32,14 @@ export function validateService(body, partial = false) {
   const textLimits = { location: 120, contact: 200, hours: 120, instructions: 500 };
   for (const [field, limit] of Object.entries(textLimits)) {
     if (!Object.hasOwn(body, field)) continue;
+    if (body[field] === null) {
+      data[field] = null;
+      continue;
+    }
     if (typeof body[field] !== 'string' || body[field].trim().length > limit) {
       return { error: `${field} must be text with at most ${limit} characters` };
     }
-    data[field] = body[field].trim();
+    data[field] = body[field].trim() || null;
   }
   if (Object.hasOwn(body, 'category')) {
     if (!['Academic', 'Financial', 'Technology', 'Student support', 'Other'].includes(body.category)) {

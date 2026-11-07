@@ -2,7 +2,7 @@
 :root {
   --bg: #F6F5F0; --panel: #FFFEFA; --panel-2: #EFEEE6; --text: #242A2A; --muted: #6B726F;
   --border: #DDDFD8; --border-strong: #C9CCC3;
-  --ticket: #355FB5; --ticket-hover: #2D519B; --link: #416FBE; --lime: #DFFF83;
+  --ticket: #4577db; --ticket-hover: #2D519B; --link: #416FBE; --lime: #DFFF83;
   --ok: #2E7A4E; --warn: #A87908; --bad: #B3261E; --bad-soft: #E7C3BF;
   --inverse-bg: #242A2A; --inverse-ink: #FFFEFA; --backdrop: rgba(36, 42, 42, .42); --ring: rgba(74, 120, 209, .2);
   --t-blue-bg: #E8F1FF; --t-blue-ink: #416FBE; --art-bg: #5B84D6;

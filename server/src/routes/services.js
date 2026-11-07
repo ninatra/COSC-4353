@@ -3,22 +3,25 @@ import { validateService, parseServiceId } from '../validation/service.js';
 import { prisma } from '../db.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
+import { serviceView, serviceFilter } from '../logic/entries.js';
+
 const router = Router();
 router.use(requireAuth);
 
 // Both roles can view the catalog, including closed services and their details.
 router.get('/', async (req, res) => {
   const services = await prisma.service.findMany({
-    orderBy: { id: 'asc' },
+    orderBy: { id: 'asc' }, include: { queue: true },
   });
-  res.json({ services });
+  res.json({ services: services.map(serviceView) });
 });
 
 router.post('/', requireRole('ADMIN'), async (req, res) => {
   const { data, error } = validateService(req.body);
   if (error) return res.status(400).json({ error });
-  const service = await prisma.service.create({ data });
-  res.status(201).json({ service });
+  const { isOpen = true, ...fields } = data;
+  const service = await prisma.service.create({ data: { ...fields, queue: { create: { status: isOpen ? 'OPEN' : 'CLOSED' } } }, include: { queue: true } });
+  res.status(201).json({ service: serviceView(service) });
 });
 
 // Accept any subset of the supported fields, including opening/closing a service.
@@ -30,8 +33,13 @@ router.put('/:id', requireRole('ADMIN'), async (req, res) => {
   const { data, error } = validateService(req.body, true);
   if (error) return res.status(400).json({ error });
   try {
-    const service = await prisma.service.update({ where: { id }, data });
-    res.json({ service });
+    const { isOpen, ...fields } = data;
+    if (isOpen !== undefined) {
+      const status = isOpen ? 'OPEN' : 'CLOSED';
+      fields.queue = { upsert: { create: { status }, update: { status } } };
+    }
+    const service = await prisma.service.update({ where: { id }, data: fields, include: { queue: true } });
+    res.json({ service: serviceView(service) });
   } catch (err) {
     if (err.code === 'P2025') {
       return res.status(404).json({ error: 'Service not found' });
@@ -46,7 +54,7 @@ router.delete('/:id', requireRole('ADMIN'), async (req, res) => {
   try {
     // Preserve visits and queue history rather than cascading their deletion.
     await prisma.$transaction(async (db) => {
-      const entries = await db.queueEntry.count({ where: { serviceId: id } });
+      const entries = await db.queueEntry.count({ where: serviceFilter(id) });
       if (entries) throw Object.assign(new Error('This service has queue history. Close it instead of deleting it.'), { status: 409 });
       await db.service.delete({ where: { id } });
     });

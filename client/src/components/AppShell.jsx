@@ -6,6 +6,7 @@ import { useQueues } from '../QueueContext.jsx';
 import { useTheme } from '../useTheme.js';
 import { firstName, fmtTime, initials } from '../utils/format.js';
 import Icon from './Icon.jsx';
+import { useToast } from './Toast.jsx';
 
 // [path, label, icon, short label for the phone tab bar, match exactly]
 const USER_NAV = [
@@ -51,6 +52,7 @@ export function ThemeButton() {
 }
 
 function NotificationButton({ isAdmin, userEmail, state, markUpdateRead }) {
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   const audience = isAdmin ? 'admin' : userEmail;
@@ -102,7 +104,7 @@ function NotificationButton({ isAdmin, userEmail, state, markUpdateRead }) {
                     <p>{fillService(state, notification.body, notification.serviceId)}</p>
                     <time>{fmtTime(notification.t)}</time>
                   </div>
-                  <button type="button" className="notification-read" onClick={() => markUpdateRead(audience, notification.n)}>
+                  <button type="button" className="notification-read" onClick={() => markUpdateRead(audience, notification.n).catch(error => toast(error.message))}>
                     Mark read
                   </button>
                 </li>

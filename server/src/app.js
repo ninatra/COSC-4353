@@ -27,6 +27,15 @@ app.use((err, req, res, next) => {
   if (err.type === 'entity.parse.failed') {
     return res.status(400).json({ error: 'Request body must be valid JSON' });
   }
+  if (err.code === 'P2002') {
+    return res.status(409).json({ error: 'A record with this unique value already exists' });
+  }
+  if (err.message?.includes('Validation:') || ['P2000', 'P2005', 'P2006', 'P2007', 'P2011', 'P2012'].includes(err.code)) {
+    return res.status(400).json({ error: 'A field is missing, has an invalid type, or exceeds its allowed limit' });
+  }
+  if (err.code === 'P2003') {
+    return res.status(400).json({ error: 'A related record does not exist' });
+  }
   console.error(err);
   res.status(500).json({ error: 'Something went wrong' });
 });

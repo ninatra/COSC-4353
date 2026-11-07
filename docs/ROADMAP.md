@@ -41,7 +41,6 @@ Screens refresh after actions and poll every 10 seconds. Tickets use stored serv
 Rules in `server/src/logic/notifications.js`, saved by queue routes:
 
 - Users: Ticket confirmed on joining, Almost ready at position 2, You’re next at position 1, and served/left/removed notices.
-- Almost ready and You’re next are separate alerts, each sent once per visit.
 - Admin bell: first visitor in an empty queue and queue reaching capacity. Routine joins appear on the Notifications page without increasing the bell count.
 - Admin actions show confirmation toasts. No email/SMS delivery.
 - `GET /api/notifications`, `PATCH /api/notifications/:id/read`, `PATCH /api/notifications/read-all`, `DELETE /api/notifications`.

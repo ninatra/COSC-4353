@@ -29,13 +29,13 @@ export function joinNotifications({ entry, service, position, waitingCount, user
   return notices;
 }
 
-// "Almost ready" notices for visitors who just reached the front of an
-// ordered queue and haven't been told yet.
-export function almostReadyNotifications(ordered, alertedEntryIds, service, nextAlertedEntryIds = []) {
-  const alerted = new Set(alertedEntryIds);
-  const nextAlerted = new Set(nextAlertedEntryIds);
+// Notify on entering position 2 from farther back, or position 1 from any
+// lower position. New arrivals at either position also receive an alert.
+export function almostReadyNotifications(ordered, previous, service) {
+  const positions = new Map(previous.map((entry, index) => [entry.id, index + 1]));
   return ordered.slice(0, ALMOST_READY_POSITION)
-    .filter((entry, index) => entry.status === 'WAITING' && !(index === 0 ? nextAlerted : alerted).has(entry.id))
+    .filter((entry, index) => entry.status === 'WAITING'
+      && (positions.get(entry.id) ?? Infinity) > index + 1)
     .map((entry) => {
       const position = ordered.indexOf(entry) + 1;
       return {

@@ -6,15 +6,15 @@
   "main": "src/index.js",
   "scripts": {
     "test": "node --test",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include='src/**/*.js'",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include='src/**/*.js' --test-coverage-include='prisma/**/*.js' --test-coverage-lines=80 --test-coverage-branches=80 --test-coverage-functions=80",
     "dev": "node --watch --env-file=.env src/index.js",
     "start": "node --env-file=.env src/index.js",
-    "db:setup": "prisma db push && prisma db seed",
+    "db:setup": "prisma db push && npm run db:constraints",
+    "db:constraints": "node --env-file=.env prisma/enforce-constraints.js",
+    "db:upgrade-queues": "node --env-file=.env prisma/upgrade-queues.js",
     "db:studio": "prisma studio",
-    "db:sql": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/schema.sql"
-  },
-  "prisma": {
-    "seed": "node --env-file=.env prisma/seed.js"
+    "db:sql": "prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/schema.sql && node prisma/enforce-constraints.js --sql >> prisma/schema.sql",
+    "db:seed": "prisma db seed"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
@@ -25,5 +25,8 @@
   },
   "devDependencies": {
     "prisma": "^6.19.0"
+  },
+  "prisma": {
+    "seed": "node --env-file=.env prisma/seed.js"
   }
 }

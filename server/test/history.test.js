@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
-import { FINISHED_STATUSES, sortHistory, toHistoryRow } from '../src/logic/history.js';
+import { FINISHED_STATUSES, sortHistory, toHistoryRow, historyQuery } from '../src/logic/history.js';
 import { sampleService, startApp } from './helpers/app.js';
 
 describe('history rows', () => {
@@ -83,6 +83,30 @@ describe('history API', () => {
     assert.equal((await app.request('GET', '/history?paginated=true&pageSize=999', { token: admin.token })).status, 400);
   });
 
+  test('outcome filters retrieve matching served visits and preserve ownership', async () => {
+    const visitor = await app.account('USER', 'Outcome Student');
+    const id = (await app.request('POST', '/services', { token: admin.token, body: sampleService() })).body.service.id;
+    for (const outcome of ['completed', 'referred', 'unresolved', 'follow-up', null]) {
+      const joined = await app.request('POST', `/queues/${id}/join`, { token: visitor.token });
+      assert.equal(joined.status, 201);
+      assert.equal((await app.request('POST', `/queues/${id}/serve-next`, { token: admin.token, body: { outcome: outcome ?? 'completed' } })).status, 200);
+      if (outcome === null) await app.prisma.history.update({ where: { entryId: joined.body.entry.id }, data: { outcome: null } });
+    }
+    await app.request('POST', `/queues/${id}/join`, { token: visitor.token });
+    await app.request('POST', `/queues/${id}/leave`, { token: visitor.token });
+    for (const outcome of ['completed', 'referred', 'unresolved', 'follow-up']) {
+      const query = `/history?paginated=true&serviceId=${id}&outcome=${outcome}&search=Outcome&pageSize=10`;
+      const result = await app.request('GET', query, { token: admin.token });
+      assert.equal(result.status, 200);
+      assert.equal(result.body.total, outcome === 'completed' ? 2 : 1);
+      assert.ok(result.body.history.every(row => row.result === 'served' && row.outcome === outcome));
+      assert.equal((await app.request('GET', query, { token: other.token })).body.total, 0);
+    }
+    const conflict = await app.request('GET', `/history?paginated=true&serviceId=${id}&status=LEFT&outcome=referred`, { token: admin.token });
+    assert.equal(conflict.body.total, 1, 'an outcome selects served visits');
+    assert.equal((await app.request('GET', '/history?paginated=true&outcome=invalid', { token: admin.token })).status, 400);
+  });
+
   test('editing checks role, ID, input and visit status', async () => {
     const { history } = (await app.request('GET', '/history', { token: admin.token })).body;
     const served = history.find((r) => r.result === 'served');
@@ -98,5 +122,32 @@ describe('history API', () => {
     assert.equal(changed.body.visit.result, 'left');
     assert.equal(changed.body.visit.outcome, null);
     assert.equal(changed.body.visit.problem, left.problem);
+  });
+});
+
+describe('history query filters', () => {
+  test('outcome filters select served visits and match legacy completed outcomes', () => {
+    assert.equal(historyQuery({ outcome: 'referred', status: 'LEFT' }).where.status, 'SERVED');
+    assert.equal(historyQuery({ outcome: 'referred' }).where.outcome, 'referred');
+    assert.deepEqual(historyQuery({ outcome: 'completed' }).where.OR, [{ outcome: 'completed' }, { outcome: null }]);
+    assert.ok(historyQuery({ outcome: ['completed', 'referred'] }).error);
+  });
+  test('history queries default to a bounded page of finished visits', () => {
+    const result = historyQuery({});
+    assert.equal(result.pageSize, 15);
+    assert.equal(result.skip, 0);
+    assert.deepEqual(result.where.status.in, ['SERVED', 'LEFT', 'NO_SHOW']);
+  });
+  test('history queries combine service, status, dates, search and pagination', () => {
+    const result = historyQuery({ page: '2', serviceId: '3', status: 'SERVED', from: '2026-10-23T05:00:00Z', to: '2026-10-24T05:00:00Z', search: ' AA-002 ' });
+    assert.equal(result.skip, 15);
+    assert.equal(result.where.entry.queue.serviceId, 3);
+    assert.equal(result.where.status, 'SERVED');
+    assert.equal(result.where.entry.OR[0].ticketId.contains, 'AA-002');
+    assert.equal(result.where.entry.OR[1].user.profile.fullName.contains, 'AA-002');
+    assert.equal(result.where.completedAt.lt.toISOString(), '2026-10-24T05:00:00.000Z');
+  });
+  test('history queries reject invalid pagination, filters and date ranges', () => {
+    for (const query of [{ page: '0' }, { page: '1.5' }, { pageSize: '1000' }, { serviceId: '-1' }, { status: 'WAITING' }, { from: 'invalid' }, { from: '2026-10-24', to: '2026-10-23' }, { search: 'x'.repeat(101) }]) assert.ok(historyQuery(query).error);
   });
 });

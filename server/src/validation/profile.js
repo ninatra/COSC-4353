@@ -1,4 +1,4 @@
-import { LIMITS } from './auth.js';
+import { EMAIL_RE, LIMITS } from './auth.js';
 
 export const PHONE_MAX = 20;
 // Digits with optional spaces, dashes, dots, parentheses and a leading +.
@@ -10,6 +10,12 @@ export function validateProfile(body) {
     return { error: 'Profile details must be an object' };
   }
   const data = {};
+  if (Object.hasOwn(body, 'email')) {
+    if (typeof body.email !== 'string' || body.email.trim().length > LIMITS.email || !EMAIL_RE.test(body.email.trim())) {
+      return { error: 'Email address is not valid' };
+    }
+    data.email = body.email.trim().toLowerCase();
+  }
   if (Object.hasOwn(body, 'fullName')) {
     if (typeof body.fullName !== 'string' || !body.fullName.trim()) {
       return { error: 'Full name is required and must be text' };
