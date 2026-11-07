@@ -95,14 +95,14 @@ Useful commands:
 
 ## Database (A4)
 
-- **Database:** SQLite, accessed through Prisma. The schema is in `server/prisma/schema.prisma`; `npm run db:sql -w server` writes the matching `CREATE TABLE` statements (primary keys, foreign keys, unique constraints) to `server/prisma/schema.sql`.
-- **Users:** `UserCredentials` holds the login (email as the unique username, bcrypt password hash, role). `UserProfile` holds the full name, optional phone and the "almost ready" alert preference, linked to the login by email. Both are created together at registration; users edit their profile on the Profile page.
-- **Notifications:** each notice has a status of `SENT` or `VIEWED`.
-- **Queues:** each service has one `Queue` with `OPEN`/`CLOSED` status and a created date. `QueueEntry` links a visitor to that queue, stores their 1-based position while waiting, and uses `WAITING`, `SERVED`, or `CANCELED` status. Positions update after reordering and departures.
-- **History:** finished entries have a separate `History` record for completion/served times, outcome, problem, and notes. History also distinguishes voluntary departures from admin removals. Entries retain their ticket IDs; their position becomes null when finished.
-- **Validation:** API validators enforce required fields, types, formats, and lengths before writing. SQLite triggers enforce required nonblank text, field lengths, integer ranges, booleans, dates, and allowed statuses for inserts and updates, including direct SQL. Unique email indexes and foreign keys protect account identity and relations. Passwords accept 8–72 characters with a maximum of 72 UTF-8 bytes before bcrypt hashing.
-- **Installing database validation:** `npm run setup` installs it automatically. For an existing database, run `npm run db:constraints -w server`. This checks existing records first and reports invalid data without changing it. After a manual `prisma db push`, rerun that command because a table rebuild can remove triggers. `schema.sql` and the validation migration also include these constraints.
-- **Upgrading the previous combined queue schema:** stop the app, run `npm run db:upgrade-queues -w server`, then `npx prisma generate --schema server/prisma/schema.prisma` and restart. The upgrade saves a backup and preserves existing accounts, queues, and visits. New databases use `npm run setup`.
+SQLite stores the data, with Prisma connecting the backend to the database. Table definitions and relationships are in `server/prisma/schema.prisma`; SQL statements are in `server/prisma/schema.sql`.
+
+- **Accounts:** `UserCredentials` stores login details; `UserProfile` stores names, phone numbers, and alert preferences.
+- **Services and queues:** `Service` stores service details, `Queue` controls open/closed status, and `QueueEntry` tracks visitors and their positions.
+- **History and notifications:** `History` stores completed visit details; `Notification` stores in-app alerts and read status.
+- **Validation:** backend checks and database constraints enforce required fields, types, lengths, unique emails, and valid relationships.
+
+Run `npm run setup` to initialize the database and validation rules. After a manual `prisma db push`, reinstall validation with `npm run db:constraints -w server`. Regenerate SQL with `npm run db:sql -w server`.
 
 ## Project Structure
 
